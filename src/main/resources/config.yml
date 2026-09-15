@@ -1,0 +1,22 @@
+# Piksel metin kalibrasyonu. Çark ya da editör ekranı oyunda kaymış veya yanlış boyutta
+# görünürse /wheel tune ile canlı ayarla; değerler buraya kaydedilir.
+#
+# text-pixel-blocks: scale=1 iken bir font pikselinin blok cinsinden boyu.
+# text-top-units:    görüntünün üst kenarının TextDisplay kökenine göre yüksekliği (font pikseli).
+# text-line-units:   bir metin satırının yüksekliği (font pikseli); görüntüyü ortalamak için kullanılır.
+text-pixel-blocks: 0.025
+text-top-units: 3.0
+text-line-units: 10.0
+
+# Dönüş sırasında her tick gönderilen güncellemenin istemcide kaç tick'e yayılacağı.
+# Büyüdükçe dönüş daha akıcı ama biraz daha gecikmeli görünür.
+interpolation-ticks: 3
+
+# Dünyadaki çarkın yanındaki eski panel ayarları (kullanılmıyor, ileride lazım olabilir).
+panel-pixel-blocks: 0.018
+panel-distance: 2.6
+
+# Editör ekranındaki panel resminin kaydırması (GUI pikseli).
+# Panel butonlarla hizasızsa oyun içinde: /wheel ui <dx> <dy>
+ui-offset-x: 0
+ui-offset-y: 0

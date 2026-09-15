@@ -1,0 +1,15 @@
+name: SunshineWheel
+version: '${version}'
+main: me.guldal.sunshinewheel.SunshineWheel
+api-version: '26.2'
+author: Sunshine Survival
+description: Oyun içi editörlü şans çarkı sistemi
+commands:
+  wheel:
+    description: Şans çarkı yönetimi
+    aliases: [cark]
+    permission: sunshinewheel.admin
+permissions:
+  sunshinewheel.admin:
+    description: Çark oluşturma, düzenleme ve test komutları
+    default: op
