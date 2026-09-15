@@ -38,7 +38,36 @@ Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugin
 
 ## 2. Teknik temel: yazıyla resim çizmek
 
-Minecraft'ta sunucu tarafından özel arayüz çizmenin tek yolu **kaynak paketine font koymak**.
+**GÜNCEL (v2):** Editör paneli artık piksel piksel değil, **hazır sprite + gerçek font** ile çiziliyor.
+Eski yöntem 280x170 panel için kare başına **96.223 karakter (~289 KB)** üretiyordu ve her fare
+hareketinde yeniden gönderiliyordu (oyuncu başına ~2.9 MB/s) — panelin "olmadığı" yer buydu.
+Ölçülmüş yeni değerler: panel karesi **~392 karakter (~1.2 KB)**, önizleme ayrı display'de ve
+yalnızca ödül/renk değişince yeniden kodlanıyor (~5.000 karakter, seyrek). ~245 kat iyileşme.
+
+Yeni dosyalar:
+- `render/Ui2.java` — sprite + metin birleştirici tuval (`Ui2.Canvas`), karakter aralıkları:
+  U+E900+slot\*64+harf (metin), U+F100+sprite\*32+slot (widget)
+- `render/PixelText.encodeAt(...)` — görüntüyü mevcut satırın içine (x,y) koymak için (önizleme/imleç)
+- `render/PixelText.pad(...)` — alt boş satırlar (merkezleme)
+- `editor/EditorPanel.java` — Component tabanlı yeni panel (aynı buton/hit-test mantığı)
+- `editor/EditorSession.java` — panel display'i + **ayrı önizleme display'i** (positionPreview)
+- `WheelListener` — F (el değiştirme) = kapat, fare tekerleği (PlayerItemHeldEvent) = kaydırıcı ince ayar
+- `pack/art/generate_ui2.py` — panel zeminini (2 parça), 15 widget'ı ve 53 metin glifini (Consolas 10,
+  6x10 hücre, ilerleme 7) üretir
+- `pack/generate_pack2.py` — px + ui + **ui2** fontlarını tek pack.zip'te toplar
+  (`dist/sunshinewheel-pack-ui2.zip`, ui2.json ~81 KB / 775 provider)
+
+**Kritik kural:** `pack/generate_pack2.py`, `render/Ui2.java` ve `editor/EditorPanel.java`
+içindeki konum listeleri (TEXT_Y, ART_Y, PANEL_W/H, TEXT_CHARS) birebir aynı olmalı.
+Konum eklemek istersen üçünü birden güncelle, sonra:
+`python pack/art/generate_ui2.py` → `python pack/generate_pack2.py 88 0` → `gradlew build`.
+
+**Paket dağıtımı:** ui2 fontu canlıya giderken Oraxen zincirine de kopyalanmalı
+(`wheel_ui_deploy.sh` bunu yapıyor; assets/sunshinewheel/ui2.json + ui2 dokuları).
+Font canlı pakette yoksa panel boş/kutu görünür — panelin "çalışmıyor" sanılmasının
+bir diğer sebebi bu.
+
+Minecraft'ta sunucu tarafından özel arayüz çizmenin yolu **kaynak paketine font koymak**.
 Resimler birer "harf" olur, negatif boşluk karakterleriyle istenen yere kaydırılır.
 
 Pakette iki font var (`assets/sunshinewheel/`):
