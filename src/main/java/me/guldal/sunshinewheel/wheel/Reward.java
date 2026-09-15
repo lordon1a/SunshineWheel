@@ -8,13 +8,31 @@ import org.bukkit.Material;
 
 public final class Reward {
 
-    /** MiniMessage biçiminde. */
+    /** MiniMessage biçiminde; <chance> yazılırsa o anki yüzdeyle değişir. */
     public String name;
     public double weight;
     public int color;
     public Material icon;
-    /** Konsoldan çalıştırılır; %player% oyuncu adıyla değişir. */
+    /** Konsoldan çalıştırılır; %player% %reward% %wheel% değişir. */
     public final List<String> commands = new ArrayList<>();
+    /** Boşsa herkes kazanabilir. */
+    public String permission = "";
+    /** Boşsa çarkın varsayılan kazanma mesajı kullanılır; <chance> desteklenir. */
+    public String winMessage = "";
+    /** Boşsa çarkın kazanma sesi kullanılır. */
+    public String winSound = "";
+    /** Eşya olarak verilecekse adet. */
+    public int amount = 1;
+    /** Açıkken ikon eşyası kazananın envanterine verilir (komutlara ek olarak). */
+    public boolean giveItem;
+    /** Eşya verilirken parlama efekti eklenir. */
+    public boolean glow;
+    /** Kapalı ödüller çarkta görünmez ve kazanılamaz. */
+    public boolean enabled = true;
+    /** Eşya verilirken eklenen açıklama satırları (MiniMessage). */
+    public final List<String> lore = new ArrayList<>();
+    /** 0 = yok. */
+    public int customModelData;
 
     public Reward(String name, double weight, int color, Material icon, List<String> commands) {
         this.name = name;
@@ -25,7 +43,7 @@ public final class Reward {
     }
 
     static Reward fromMap(Map<?, ?> map) {
-        String name = string(map, "name", "Ödül");
+        String name = string(map, "name", "Reward");
         double weight = map.get("weight") instanceof Number n ? n.doubleValue() : 1.0;
         int color = parseColor(string(map, "color", "#808080"));
         Material icon = Material.matchMaterial(string(map, "icon", "CHEST"));
@@ -33,7 +51,21 @@ public final class Reward {
         if (map.get("commands") instanceof List<?> list) {
             list.forEach(o -> commands.add(String.valueOf(o)));
         }
-        return new Reward(name, weight, color, icon == null ? Material.CHEST : icon, commands);
+        Reward reward = new Reward(name, weight, color,
+                icon == null || !icon.isItem() ? Material.CHEST : icon, commands);
+        reward.permission = string(map, "permission", "");
+        reward.winMessage = string(map, "win-message", "");
+        reward.winSound = string(map, "win-sound", "");
+        reward.amount = map.get("amount") instanceof Number n ? Math.min(64, Math.max(1, n.intValue())) : 1;
+        reward.giveItem = map.get("give-item") instanceof Boolean b ? b : false;
+        reward.glow = map.get("glow") instanceof Boolean g ? g : false;
+        reward.enabled = !(map.get("enabled") instanceof Boolean e) || e;
+        if (map.get("lore") instanceof List<?> loreList) {
+            loreList.forEach(o -> reward.lore.add(String.valueOf(o)));
+        }
+        reward.customModelData = map.get("custom-model-data") instanceof Number c
+                ? Math.max(0, c.intValue()) : 0;
+        return reward;
     }
 
     Map<String, Object> toMap() {
@@ -43,6 +75,15 @@ public final class Reward {
         map.put("color", String.format("#%06X", color & 0xFFFFFF));
         map.put("icon", icon.name());
         map.put("commands", new ArrayList<>(commands));
+        map.put("permission", permission);
+        map.put("win-message", winMessage);
+        map.put("win-sound", winSound);
+        map.put("amount", amount);
+        map.put("give-item", giveItem);
+        map.put("glow", glow);
+        map.put("enabled", enabled);
+        map.put("lore", new ArrayList<>(lore));
+        map.put("custom-model-data", customModelData);
         return map;
     }
 

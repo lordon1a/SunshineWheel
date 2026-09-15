@@ -6,26 +6,24 @@ import java.util.List;
 public final class WheelArt {
 
     private static final int OUTLINE = 0x2B1A0C;
-    private static final int FRAME = 0xD08A33;
-    private static final int FRAME_LIGHT = 0xF0B35A;
-    private static final int FRAME_DARK = 0x9A5F20;
-    private static final int HUB = 0xE2A44A;
-    private static final int HUB_DARK = 0x9A5F20;
-    private static final int RIVET = 0xF5D28A;
-    private static final int POINTER = 0xF2B544;
-    private static final int POINTER_LIGHT = 0xFFD98A;
 
     private WheelArt() {
     }
 
-    public static PixelImage wheel(List<Integer> segmentColors, int size) {
+    public static PixelImage wheel(List<Integer> segmentColors, int size, int frameColor, int hubColor) {
         int count = Math.max(1, segmentColors.size());
         PixelImage image = new PixelImage(size, size);
+        int frame = frameColor & 0xFFFFFF;
+        int frameLight = shade(frame, 1.3);
+        int frameDark = shade(frame, 0.68);
+        int hub = hubColor & 0xFFFFFF;
+        int hubDark = shade(hub, 0.62);
+        int rivet = shade(frame, 1.65);
         double center = (size - 1) / 2.0;
         double outer = size / 2.0 - 0.5;
         double frameWidth = Math.max(5, size * 0.075);
         double inner = outer - frameWidth;
-        double hub = Math.max(4, size * 0.08);
+        double hubRadius = Math.max(4, size * 0.08);
         double segment = 360.0 / count;
 
         for (int y = 0; y < size; y++) {
@@ -43,12 +41,12 @@ public final class WheelArt {
                     if (distance < inner + 1.2) {
                         color = OUTLINE;
                     } else if (distance > outer - 2.4) {
-                        color = FRAME_DARK;
+                        color = frameDark;
                     } else {
-                        color = (dx + dy) < 0 ? FRAME_LIGHT : FRAME;
+                        color = (dx + dy) < 0 ? frameLight : frame;
                     }
-                } else if (distance < hub) {
-                    color = distance > hub - 1.2 ? OUTLINE : (distance < hub * 0.35 ? HUB_DARK : HUB);
+                } else if (distance < hubRadius) {
+                    color = distance > hubRadius - 1.2 ? OUTLINE : (distance < hubRadius * 0.35 ? hubDark : hub);
                 } else {
                     double angle = (Math.toDegrees(Math.atan2(dx, -dy)) + 360.0) % 360.0;
                     int index = Math.min(count - 1, (int) (angle / segment));
@@ -60,7 +58,7 @@ public final class WheelArt {
                         color = segmentColors.isEmpty() ? 0x808080 : segmentColors.get(index);
                         if (distance > inner - 2.2) {
                             color = shade(color, 0.78);
-                        } else if (distance < hub + 2.2) {
+                        } else if (distance < hubRadius + 2.2) {
                             color = shade(color, 0.85);
                         }
                     }
@@ -80,7 +78,7 @@ public final class WheelArt {
             for (int oy = -rivetRadius; oy <= rivetRadius; oy++) {
                 for (int ox = -rivetRadius; ox <= rivetRadius; ox++) {
                     boolean edge = Math.abs(ox) == rivetRadius || Math.abs(oy) == rivetRadius;
-                    image.set(px + ox, py + oy, 0xFF000000 | (edge ? OUTLINE : RIVET));
+                    image.set(px + ox, py + oy, 0xFF000000 | (edge ? OUTLINE : rivet));
                 }
             }
         }
@@ -88,8 +86,10 @@ public final class WheelArt {
     }
 
     /** Aşağıyı gösteren ok. */
-    public static PixelImage pointer(int width, int height) {
+    public static PixelImage pointer(int width, int height, int color) {
         PixelImage image = new PixelImage(width, height);
+        int base = color & 0xFFFFFF;
+        int light = shade(base, 1.35);
         double center = (width - 1) / 2.0;
         int capRows = Math.max(2, height / 5);
         for (int y = 0; y < height; y++) {
@@ -100,8 +100,8 @@ public final class WheelArt {
                     continue;
                 }
                 boolean edge = offset > half - 0.7 || y == 0 || y == height - 1;
-                int color = edge ? OUTLINE : (x < center ? POINTER_LIGHT : POINTER);
-                image.set(x, y, 0xFF000000 | color);
+                int pixel = edge ? OUTLINE : (x < center ? light : base);
+                image.set(x, y, 0xFF000000 | pixel);
             }
         }
         return image;

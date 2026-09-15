@@ -1,28 +1,18 @@
 package me.guldal.sunshinewheel.wheel;
 
-/** config.yml'deki piksel metin kalibrasyonu, animasyon yumuşatması ve editör ekranı ölçüleri. */
+/** config.yml'deki piksel metin kalibrasyonu ve animasyon yumuşatması. */
 public final class RenderSettings {
 
     public double textPixelBlocks;
     public double textTopUnits;
     public double textLineUnits;
     public int interpolationTicks;
-    public double panelPixelBlocks;
-    public double panelDistance;
-    /** Editör ekranındaki panel resminin kaydırması (GUI pikseli); /wheel ui ile ayarlanır. */
-    public int uiOffsetX;
-    public int uiOffsetY;
 
-    public RenderSettings(double textPixelBlocks, double textTopUnits, double textLineUnits, int interpolationTicks,
-            double panelPixelBlocks, double panelDistance, int uiOffsetX, int uiOffsetY) {
+    public RenderSettings(double textPixelBlocks, double textTopUnits, double textLineUnits, int interpolationTicks) {
         this.textPixelBlocks = textPixelBlocks;
         this.textTopUnits = textTopUnits;
         this.textLineUnits = textLineUnits;
         this.interpolationTicks = interpolationTicks;
-        this.panelPixelBlocks = panelPixelBlocks;
-        this.panelDistance = panelDistance;
-        this.uiOffsetX = uiOffsetX;
-        this.uiOffsetY = uiOffsetY;
     }
 
     /** Görüntü merkezini TextDisplay kökenine en çok yaklaştıran boş satır sayısı. */

@@ -3,41 +3,37 @@ package me.guldal.sunshinewheel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import me.guldal.sunshinewheel.editor.DialogEditor;
-import me.guldal.sunshinewheel.editor.EditorManager;
-import me.guldal.sunshinewheel.menu.ChestMenu;
+import java.util.Map;
+import java.util.UUID;
+import me.guldal.sunshinewheel.web.WebServer;
 import me.guldal.sunshinewheel.wheel.MotionStyle;
 import me.guldal.sunshinewheel.wheel.WheelInstance;
 import me.guldal.sunshinewheel.wheel.WheelManager;
-import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.Material;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-/** Yönetim komutları. Ayarların çoğu /wheel edit ile açılan editörden yapılır. */
+/** Yönetim komutları. Çark ayarları web editörden yapılır. */
 final class WheelCommand implements TabExecutor {
 
-    private static final MiniMessage MM = MiniMessage.miniMessage();
-    private static final List<String> SUBS = List.of("create", "edit", "dialog", "menu", "move", "cancel", "remove",
-            "list", "spin", "set", "tune", "ui", "angle", "reload");
+    private static final List<String> SUBS = List.of("create", "move", "cancel", "remove", "list", "spin", "set",
+            "tune", "angle", "reload", "web", "give", "take", "ticket", "stats", "resetcooldown", "preview");
     private static final List<String> TUNE_KEYS = List.of("text-pixel-blocks", "text-top-units", "text-line-units",
-            "interpolation-ticks", "panel-pixel-blocks", "panel-distance");
+            "interpolation-ticks");
     private static final List<String> SET_KEYS = List.of("style", "duration", "revolutions", "pixel-size",
             "image-size", "upright", "item-scale");
-    private static final String PLACE_HINT = "<gold>Çarkı koymak istediğin bloğa sağ tıkla.</gold><newline>"
-            + "<gray>Zemine tıklarsan bloğun üstünde durur ve sana bakar, duvara tıklarsan duvara asılır. İptal: /wheel cancel";
 
     private final WheelManager manager;
-    private final DialogEditor dialogs;
-    private final EditorManager editors;
+    private final WebServer web;
 
-    WheelCommand(WheelManager manager, DialogEditor dialogs, EditorManager editors) {
+    WheelCommand(WheelManager manager, WebServer web) {
         this.manager = manager;
-        this.dialogs = dialogs;
-        this.editors = editors;
+        this.web = web;
     }
 
     @Override
@@ -49,63 +45,61 @@ final class WheelCommand implements TabExecutor {
         switch (sub) {
             case "create" -> {
                 if (!(sender instanceof Player player) || args.length < 2) {
-                    return msg(sender, "<red>Kullanım (oyunda): /wheel create <id>");
+                    return msg(sender, Messages.mm("command.create-usage"));
                 }
-                if (manager.get(args[1]) != null || manager.isPendingCreate(args[1])) {
-                    return msg(sender, "<red>Bu id zaten var.");
+                String id = args[1].toLowerCase(Locale.ROOT);
+                if (!id.matches("[a-z0-9_-]{1,32}")) {
+                    return msg(sender, Messages.mm("command.bad-id"));
                 }
-                manager.startPlacement(player, args[1], false);
-                return msg(sender, PLACE_HINT);
-            }
-            case "edit" -> {
-                WheelInstance wheel = args.length < 2 ? null : manager.get(args[1]);
-                if (!(sender instanceof Player player) || wheel == null) {
-                    return msg(sender, "<red>Kullanım (oyunda): /wheel edit <id>");
+                if (manager.get(id) != null || manager.isPendingCreate(id)) {
+                    return msg(sender, Messages.mm("command.id-taken"));
                 }
-                editors.open(player, wheel);
-                return true;
-            }
-            case "dialog" -> {
-                WheelInstance wheel = args.length < 2 ? null : manager.get(args[1]);
-                if (!(sender instanceof Player player) || wheel == null) {
-                    return msg(sender, "<red>Kullanım (oyunda): /wheel dialog <id>");
-                }
-                dialogs.open(player, wheel);
-                return true;
+                manager.startPlacement(player, id, false);
+                return msg(sender, Messages.mm("place.hint"));
             }
             case "move" -> {
                 if (!(sender instanceof Player player) || args.length < 2 || manager.get(args[1]) == null) {
-                    return msg(sender, "<red>Kullanım (oyunda): /wheel move <id>");
+                    return msg(sender, Messages.mm("command.move-usage"));
                 }
                 manager.startPlacement(player, args[1], true);
-                return msg(sender, PLACE_HINT);
+                return msg(sender, Messages.mm("place.hint"));
             }
             case "cancel" -> {
                 if (!(sender instanceof Player player)) {
-                    return msg(sender, "<red>Bu komut oyunda kullanılır.");
+                    return msg(sender, Messages.mm("command.only-ingame"));
                 }
                 return msg(sender, manager.cancelPlacement(player.getUniqueId())
-                        ? "<gray>Yerleştirme iptal edildi." : "<gray>Bekleyen bir yerleştirme yok.");
+                        ? Messages.mm("command.cancelled") : Messages.mm("command.no-placement"));
             }
             case "remove" -> {
                 if (args.length < 2) {
-                    return msg(sender, "<red>Kullanım: /wheel remove <id>");
+                    return msg(sender, Messages.mm("command.remove-usage"));
                 }
-                return msg(sender, manager.remove(args[1]) ? "<green>Silindi." : "<red>Böyle bir çark yok.");
+                WheelInstance wheel = manager.get(args[1]);
+                if (wheel == null) {
+                    return msg(sender, Messages.mm("command.no-wheel"));
+                }
+                if (wheel.isSpinning()) {
+                    return msg(sender, Messages.mm("command.spinning-wait"));
+                }
+                return msg(sender, manager.remove(args[1])
+                        ? Messages.mm("command.deleted") : Messages.mm("command.no-wheel"));
             }
             case "list" -> {
                 if (manager.ids().isEmpty()) {
-                    return msg(sender, "<gray>Hiç çark yok.");
+                    return msg(sender, Messages.mm("command.list-empty"));
                 }
-                manager.ids().forEach(id -> msg(sender, "<gold>• <white>" + id + " <gray>" + manager.get(id).def.summary()));
+                manager.ids().forEach(id -> msg(sender, Messages.mm("command.list-line",
+                        "id", id, "summary", manager.get(id).def.summary())));
                 return true;
             }
             case "spin" -> {
                 WheelInstance wheel = args.length < 2 ? null : manager.get(args[1]);
                 if (!(sender instanceof Player player) || wheel == null) {
-                    return msg(sender, "<red>Kullanım (oyunda): /wheel spin <id>");
+                    return msg(sender, Messages.mm("command.spin-usage"));
                 }
-                return msg(sender, wheel.spin(player) ? "<gray>Dönüyor..." : "<red>Çark zaten dönüyor ya da ödülü yok.");
+                return msg(sender, wheel.spin(player)
+                        ? Messages.mm("command.spin-start") : Messages.mm("command.spin-fail"));
             }
             case "set" -> {
                 return set(sender, args);
@@ -113,45 +107,87 @@ final class WheelCommand implements TabExecutor {
             case "tune" -> {
                 return tune(sender, args);
             }
-            case "menu" -> {
-                if (!(sender instanceof Player player)) {
-                    return msg(sender, "<red>Bu komut oyunda kullanılır.");
-                }
-                openTestMenu(player);
-                return msg(sender, "<gray>Test menüsü açıldı. Altın külçeleri çizimdeki kutuların köşelerine denk geliyor mu?");
-            }
-            case "ui" -> {
-                if (args.length < 3) {
-                    return msg(sender, "<gray>Panel kaydırması şu an: <white>" + manager.settings().uiOffsetX
-                            + ", " + manager.settings().uiOffsetY
-                            + "</white><newline><red>Kullanım: /wheel ui <dx> <dy> <gray>(GUI pikseli, eksi değer sol/yukarı)");
-                }
-                try {
-                    manager.settings().uiOffsetX = Integer.parseInt(args[1]);
-                    manager.settings().uiOffsetY = Integer.parseInt(args[2]);
-                } catch (NumberFormatException e) {
-                    return msg(sender, "<red>Geçersiz sayı.");
-                }
-                manager.saveSettings();
-                return msg(sender, "<green>Panel kaydırması güncellendi.</green> <gray>Editörü kapatıp tekrar aç.");
-            }
             case "angle" -> {
                 WheelInstance wheel = args.length < 3 ? null : manager.get(args[1]);
                 if (wheel == null) {
-                    return msg(sender, "<red>Kullanım: /wheel angle <id> <derece>");
+                    return msg(sender, Messages.mm("command.angle-usage"));
                 }
                 try {
                     int index = wheel.debugSetAngle(Double.parseDouble(args[2]));
-                    return msg(sender, "<gray>Okun altındaki dilim (kod): <white>" + (index + 1) + ". "
-                            + wheel.def.rewards.get(index).name + "</white> <gray>— görsel olarak aynı dilim mi?");
+                    if (index < 0 || index >= wheel.visibleRewards().size()) {
+                        return msg(sender, Messages.mm("command.angle-none"));
+                    }
+                    return msg(sender, Messages.mm("command.angle-result",
+                            "n", String.valueOf(index + 1), "name", wheel.visibleRewards().get(index).name));
                 } catch (NumberFormatException e) {
-                    return msg(sender, "<red>Geçersiz sayı.");
+                    return msg(sender, Messages.mm("command.bad-number"));
                 }
             }
             case "reload" -> {
                 manager.load();
                 manager.spawnAll();
-                return msg(sender, "<green>wheels.yml yeniden yüklendi.");
+                Messages.reload();
+                return msg(sender, Messages.mm("command.reloaded"));
+            }
+            case "web" -> {
+                if (web == null || !web.isRunning()) {
+                    return msg(sender, Messages.mm("command.web-off"));
+                }
+                Player player = sender instanceof Player p ? p : null;
+                String link = web.createToken(player);
+                return msg(sender, Messages.mm("command.web-link", "link", link));
+            }
+            case "give" -> {
+                if (args.length < 4) {
+                    return msg(sender, Messages.mm("command.give-usage"));
+                }
+                return freeSpins(sender, args[1], args[2], args[3], true);
+            }
+            case "take" -> {
+                if (args.length < 4) {
+                    return msg(sender, Messages.mm("command.take-usage"));
+                }
+                return freeSpins(sender, args[1], args[2], args[3], false);
+            }
+            case "ticket" -> {
+                if (args.length < 5
+                        || !(args[1].equalsIgnoreCase("give") || args[1].equalsIgnoreCase("take"))) {
+                    return msg(sender, Messages.mm("command.ticket-usage"));
+                }
+                return ticket(sender, args[1].equalsIgnoreCase("give"), args[2], args[3], args[4]);
+            }
+            case "stats" -> {
+                OfflinePlayer target = args.length >= 2 ? Bukkit.getOfflinePlayer(args[1])
+                        : (sender instanceof Player player ? player : null);
+                if (target == null) {
+                    return msg(sender, Messages.mm("command.stats-usage"));
+                }
+                msg(sender, Messages.mm("command.stats-header", "player",
+                        target.getName() == null ? "?" : target.getName()));
+                manager.ids().forEach(id -> {
+                    WheelManager.PlayerStats data = manager.stats(id, target.getUniqueId());
+                    msg(sender, Messages.mm("command.stats-line", "wheel", id,
+                            "spins", String.valueOf(data.spins),
+                            "wins", String.valueOf(data.wins),
+                            "free", String.valueOf(data.freeSpins)));
+                });
+                return true;
+            }
+            case "resetcooldown" -> {
+                if (args.length < 3) {
+                    return msg(sender, Messages.mm("command.reset-usage"));
+                }
+                UUID target = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+                return msg(sender, manager.resetCooldown(args[2], target)
+                        ? Messages.mm("command.reset-done") : Messages.mm("command.no-wheel"));
+            }
+            case "preview" -> {
+                WheelInstance wheel = args.length < 2 ? null : manager.get(args[1]);
+                if (!(sender instanceof Player player) || wheel == null) {
+                    return msg(sender, Messages.mm("command.preview-usage"));
+                }
+                wheel.sendPreview(player);
+                return true;
             }
             default -> {
                 return usage(sender);
@@ -159,32 +195,61 @@ final class WheelCommand implements TabExecutor {
         }
     }
 
-    /**
-     * Hizalama testi: sandık menüsünü sadece arka plan resmi ve birkaç işaret eşyasıyla açar.
-     * Eşyalar çizimdeki kutuların köşelerine denk geliyorsa ölçüler doğru demektir.
-     */
-    private void openTestMenu(Player player) {
-        ChestMenu menu = new ChestMenu(6, ChestMenu.background(
-                MM.deserialize("<gold>Hizalama testi"),
-                manager.settings().uiOffsetX, manager.settings().uiOffsetY));
-        int[][] markers = {{0, 0}, {0, 5}, {2, 0}, {6, 5}, {7, 0}, {8, 4}};
-        for (int[] cell : markers) {
-            menu.set(cell[0], cell[1], marker(cell[0], cell[1]), viewer -> { });
+    private boolean freeSpins(CommandSender sender, String playerName, String wheelId, String amountText,
+            boolean give) {
+        Player target = Bukkit.getPlayer(playerName);
+        WheelInstance wheel = manager.get(wheelId);
+        int amount;
+        try {
+            amount = Integer.parseInt(amountText);
+        } catch (NumberFormatException e) {
+            return msg(sender, Messages.mm("command.bad-number"));
         }
-        menu.open(player);
+        if (target == null || wheel == null || amount <= 0) {
+            return msg(sender, Messages.mm(give ? "command.give-usage" : "command.take-usage"));
+        }
+        manager.addFreeSpins(wheel.def.id, target.getUniqueId(), give ? amount : -amount);
+        int left = manager.stats(wheel.def.id, target.getUniqueId()).freeSpins;
+        String verb = Messages.fill(give ? "verb.added" : "verb.taken");
+        msg(target, Messages.mm("command.free-added", "amount", String.valueOf(amount),
+                "verb", verb, "wheel", wheel.def.id, "left", String.valueOf(left)));
+        return msg(sender, Messages.mm("command.free-done", "player", target.getName(),
+                "left", String.valueOf(left), "wheel", wheel.def.id));
     }
 
-    private static ItemStack marker(int column, int row) {
-        ItemStack item = new ItemStack(Material.GOLD_NUGGET);
-        item.editMeta(meta -> meta.displayName(MM.deserialize(
-                "<gold>sütun " + column + ", satır " + row + "</gold>")));
-        return item;
+    private boolean ticket(CommandSender sender, boolean give, String playerName, String wheelId,
+            String amountText) {
+        Player target = Bukkit.getPlayer(playerName);
+        WheelInstance wheel = manager.get(wheelId);
+        int amount;
+        try {
+            amount = Integer.parseInt(amountText);
+        } catch (NumberFormatException e) {
+            return msg(sender, Messages.mm("command.bad-number"));
+        }
+        if (target == null || wheel == null || amount <= 0) {
+            return msg(sender, Messages.mm("command.ticket-usage"));
+        }
+        if (wheel.def.ticketItem == null) {
+            return msg(sender, Messages.mm("command.no-ticket"));
+        }
+        ItemStack stack = new ItemStack(wheel.def.ticketItem, amount);
+        if (give) {
+            Map<Integer, ItemStack> leftover = target.getInventory().addItem(stack);
+            leftover.values().forEach(item -> target.getWorld().dropItemNaturally(target.getLocation(), item));
+        } else {
+            target.getInventory().removeItem(stack);
+        }
+        String verb = Messages.fill(give ? "verb.given" : "verb.taken");
+        msg(target, Messages.mm("command.ticket-done-player", "amount", String.valueOf(amount),
+                "verb", verb, "wheel", wheel.def.id));
+        return msg(sender, Messages.mm("command.ticket-done"));
     }
 
     private boolean set(CommandSender sender, String[] args) {
         WheelInstance wheel = args.length < 4 ? null : manager.get(args[1]);
         if (wheel == null) {
-            return msg(sender, "<red>Kullanım: /wheel set <id> <" + String.join("|", SET_KEYS) + "> <değer>");
+            return msg(sender, Messages.mm("command.set-usage", "keys", String.join("|", SET_KEYS)));
         }
         String value = args[3];
         try {
@@ -197,24 +262,26 @@ final class WheelCommand implements TabExecutor {
                 case "upright" -> wheel.def.itemsUpright = Boolean.parseBoolean(value);
                 case "item-scale" -> wheel.def.itemScale = Double.parseDouble(value);
                 default -> {
-                    return msg(sender, "<red>Bilinmeyen ayar.");
+                    return msg(sender, Messages.mm("command.unknown-setting"));
                 }
             }
         } catch (IllegalArgumentException e) {
-            return msg(sender, "<red>Geçersiz değer: " + value);
+            return msg(sender, Messages.mm("command.bad-value", "value", value));
         }
         manager.save();
         manager.respawn(wheel);
-        return msg(sender, "<green>Güncellendi.");
+        return msg(sender, Messages.mm("command.updated"));
     }
 
     private boolean tune(CommandSender sender, String[] args) {
         if (args.length < 3) {
-            return msg(sender, "<gray>Şu an: text-pixel-blocks=<white>" + manager.settings().textPixelBlocks
-                    + "</white> text-top-units=<white>" + manager.settings().textTopUnits
-                    + "</white> text-line-units=<white>" + manager.settings().textLineUnits
-                    + "</white> interpolation-ticks=<white>" + manager.settings().interpolationTicks
-                    + "</white><newline><red>Kullanım: /wheel tune <" + String.join("|", TUNE_KEYS) + "> <değer>");
+            return msg(sender, Messages.mm("command.tune-current",
+                    "a", String.valueOf(manager.settings().textPixelBlocks),
+                    "b", String.valueOf(manager.settings().textTopUnits),
+                    "c", String.valueOf(manager.settings().textLineUnits),
+                    "d", String.valueOf(manager.settings().interpolationTicks))
+                    .append(Component.newline())
+                    .append(Messages.mm("command.tune-usage", "keys", String.join("|", TUNE_KEYS))));
         }
         try {
             double value = Double.parseDouble(args[2]);
@@ -223,46 +290,84 @@ final class WheelCommand implements TabExecutor {
                 case "text-top-units" -> manager.settings().textTopUnits = value;
                 case "text-line-units" -> manager.settings().textLineUnits = value;
                 case "interpolation-ticks" -> manager.settings().interpolationTicks = Math.max(1, (int) value);
-                case "panel-pixel-blocks" -> manager.settings().panelPixelBlocks = value;
-                case "panel-distance" -> manager.settings().panelDistance = value;
                 default -> {
-                    return msg(sender, "<red>Bilinmeyen kalibrasyon değeri.");
+                    return msg(sender, Messages.mm("command.tune-unknown"));
                 }
             }
         } catch (NumberFormatException e) {
-            return msg(sender, "<red>Geçersiz sayı.");
+            return msg(sender, Messages.mm("command.tune-bad-number"));
         }
         manager.saveSettings();
         manager.ids().forEach(id -> manager.respawn(manager.get(id)));
-        return msg(sender, "<green>Kalibrasyon güncellendi, çarklar yeniden çizildi.");
+        return msg(sender, Messages.mm("command.tune-done"));
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> options = new ArrayList<>();
         if (args.length == 1) {
-            options.addAll(SUBS);
-        } else if (args.length == 2 && List.of("edit", "dialog", "move", "remove", "spin", "set", "angle").contains(args[0].toLowerCase(Locale.ROOT))) {
-            options.addAll(manager.ids());
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("tune")) {
-            options.addAll(TUNE_KEYS);
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-            options.addAll(SET_KEYS);
-        } else if (args.length == 4 && args[0].equalsIgnoreCase("set") && args[2].equalsIgnoreCase("style")) {
-            for (MotionStyle style : MotionStyle.values()) {
-                options.add(style.name());
-            }
+            return filter(SUBS, args[0]);
         }
-        String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
-        return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        if (args.length == 2) {
+            if (List.of("move", "remove", "spin", "set", "angle", "preview").contains(sub)) {
+                return filter(manager.ids(), args[1]);
+            }
+            if (List.of("give", "take", "stats", "resetcooldown").contains(sub)) {
+                return null;
+            }
+            if (sub.equals("ticket")) {
+                return filter(List.of("give", "take"), args[1]);
+            }
+            if (sub.equals("tune")) {
+                return filter(TUNE_KEYS, args[1]);
+            }
+            return List.of();
+        }
+        if (args.length == 3) {
+            if (List.of("give", "take", "resetcooldown").contains(sub)) {
+                return filter(manager.ids(), args[2]);
+            }
+            if (sub.equals("ticket")) {
+                return null;
+            }
+            if (sub.equals("set")) {
+                return filter(SET_KEYS, args[2]);
+            }
+            return List.of();
+        }
+        if (args.length == 4) {
+            if (sub.equals("ticket")) {
+                return filter(manager.ids(), args[3]);
+            }
+            if (sub.equals("set") && args[2].equalsIgnoreCase("style")) {
+                List<String> styles = new ArrayList<>();
+                for (MotionStyle style : MotionStyle.values()) {
+                    styles.add(style.name());
+                }
+                return filter(styles, args[3]);
+            }
+            return List.of();
+        }
+        return List.of();
+    }
+
+    private static List<String> filter(Iterable<String> options, String prefix) {
+        String lower = prefix.toLowerCase(Locale.ROOT);
+        List<String> result = new ArrayList<>();
+        options.forEach(option -> {
+            if (option.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                result.add(option);
+            }
+        });
+        return result;
     }
 
     private static boolean usage(CommandSender sender) {
-        return msg(sender, "<gold>SunshineWheel</gold> <gray>/wheel " + String.join(" | ", SUBS));
+        return msg(sender, Messages.mm("command.usage-line", "subs", String.join(" | ", SUBS)));
     }
 
-    private static boolean msg(CommandSender sender, String miniMessage) {
-        sender.sendMessage(MM.deserialize(miniMessage));
+    private static boolean msg(CommandSender sender, Component message) {
+        sender.sendMessage(message);
         return true;
     }
 }

@@ -3,3 +3,5 @@ build/
 run/
 *.iml
 .idea/
+# Server-specific deploy scripts and local build artifacts (private infra, not for sale).
+dist/

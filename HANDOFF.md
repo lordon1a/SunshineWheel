@@ -9,27 +9,76 @@ Sunucu: Sunshine Survival (Minecraft Java 26.2, Paper + Velocity), `play.guldal.
 
 ## 1. Şu an ne çalışıyor
 
-Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugins/SunshineWheel-0.1.0.jar`).
+Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugins/SunshineWheel-1.0.0.jar`).
+Sürüm 1.0.0 (2026-09-15): Java 21 hedefi, Paper 1.21 API, messages.yml (EN/TR), örnek çarklar,
+paket otomatik servisi. Release zibi: `build/distributions/SunshineWheel-release-1.0.0.zip`
+(jar + README + LICENSE + CHANGELOG + web/). Değişiklik günlüğü: CHANGELOG.md.
+Faz 1 kullanıcı testinden geçti (çevirme/TR mesajlar/web düzenleme). Mağaza taslağı: STORE_LISTING.md.
+**BuiltByBit ilanı yayında** (2026-09-15 akşamı).
 
 - **Dünyadaki çark:** Dönüyor, sağ tıkla çevriliyor, ödül veriyor. Çark görüntüsü çalışma anında
   üretiliyor (dilim sayısı ve renkler ödüllerden geliyor).
-- **Ödül sistemi:** Ad, ağırlık (şans), dilim rengi, ikon eşyası, komutlar. Ekleme/silme var.
+- **Ödül sistemi:** Ad (<chance> destekli), ağırlık (şans), dilim rengi, ikon eşyası (+adet,
+  lore, glow, custom-model-data), komutlar (%player% %reward% %wheel%), ödül izni, ödül sesi/mesajı,
+  eşya olarak verme, aç/kapa. Ekleme/silme var.
+- **Maliyet:** Bilet eşyası + para (Vault, bakiyeli) + XP seviyesi + konsol komutları; hepsi birlikte
+  denetlenir, yarım ödeme olmaz. Ücretsiz çevirme hakkı (`/wheel give|take`, data.yml'de saklanır).
+- **Kutlama:** Kazanma patlaması (parçacık) + efekt (yok/havai fişek/roket/sarmal) + dönüş sırası
+  ortam parçacığı; yayın (broadcast) açılabilir; çark/ödül izni ve aç/kapa.
+- **Görünüm:** Piksel/boyut + çerçeve/merkez/ok renkleri (çark çalışma anında yeniden çizilir).
+- **Oyuncu önizlemesi:** Eğilerek sağ tık veya `/wheel preview <id>` → sohbette ödül + yüzde listesi.
+- **Admin:** `/wheel ticket give|take`, `/wheel stats [oyuncu]`, `/wheel resetcooldown <oyuncu> <çark>`.
+- **Entegrasyon:** PlaceholderAPI (`%sunshinewheel_<id>_spins|wins|free|cooldown%`), developer
+  event'leri (`WheelSpinStartEvent`, `WheelSpinWinEvent`, iptal edilebilir).
+- **Dil:** Oyun içi mesajlar `messages.yml` (EN varsayılan) + `messages_tr.yml`; `config.yml`te
+  `language: en|tr`. Web arayüzü hep İngilizce. Konsol logları İngilizce.
+- **Örnek içerik:** İlk kurulumda daily / premium / vote çarkları otomatik oluşur (konumsuz,
+  `/wheel move` ile yerleştirilir); `/wheel create` 3 gerçek ödüllü başlangıç seti verir.
+  (2026-09-15 öncesi test çarkları silindi; canlıda a + test1 var.)
+- **Güvenlik (2026-09-15 denetimi):** Ücret iadesi (yarıda kesilen spin), kalıcı bekleme süresi,
+  ses anahtarı doğrulaması, ödül/lore/komut limitleri (64/32/64), `/wheel remove` spin koruması,
+  `POST /api/logout` ile oturum iptali, nginx rate-limit (`/wheel/api/` 10r/sn), CORS yok,
+  bilet tanınmazsa uyarı + kapalı sayma, bozuk isim koruması. Bilinen sınırlar: oturum 12 saat
+  (çalınırsa TTL sonuna kadar geçerli), aynı anda iki admin yazarsa son yazan kazanır, restart
+  bekleyen spin'i iptal eder (ücret iade edilir).
 - **Maliyet ve bilet, bekleme süresi, sesler, parçacıklar, hologram** ayarları var.
 - **Yerleştirme modu:** `/wheel create <id>` ve `/wheel move <id>` — sonra bir bloğa sağ tıklıyorsun.
   Zemine koyarsan üstünde durur, duvara koyarsan asılır.
-- **İki editör:** `/wheel edit <id>` display entity paneli, `/wheel dialog <id>` dialog ekranı.
+- **Web editör (asıl arayüz):** `https://rehber.guldal.me/wheel/` — eklenti içindeki JSON API
+  (`web/WebServer.java`, yalnızca 127.0.0.1:8770'e bağlanır) nginx ile HTTPS'e proxy'lenir.
+  Giriş: oyunda `/wheel web` → 10 dk geçerli tek kullanımlık anahtar → tarayıcıda oturum (12 saat).
+  Arayüz `/var/www/wheel` altında statik dosyalar (index.html, app.js, style.css) — restart
+  gerekmeden güncellenir. Düzen Sam's gibi: solda bölüm kenar çubuğu (General … Particles) +
+  altta Save & apply, ortada formlar, sağda canvas canlı önizleme. Arayüz tamamen İngilizce;
+  API hata mesajları, MotionStyle adları ve konsol logları da İngilizce.
+  Kaydet & Uygula, YAML'ı yazar ve çarkı canlıda yeniden doğurur; çark dönerken kaydetme 409 ile
+  engellenir.
+- **Kaynak paketi (ürün):** Çark `sunshinewheel:px` fontuyla çizilir. Eklenti ilk açılışta
+  `plugins/SunshineWheel/pack.zip` üretir (mcmeta format 34 + px.json + 1x1 px.png, ~2KB,
+  `web/PackServer.java`, AWT'siz) ve `pack.port` (varsayılan 8765) üzerinden servis eder; konsola
+  URL + sha1 basar (`server.properties`: resource-pack / resource-pack-sha1). Birleştirmek isteyen
+  aynı zip'ten `assets/sunshinewheel` klasörünü alır. Canlıda mevcut Velocity zinciri kullanılıyor;
+  8765 yalnızca localhost testinde doğrulandı (2026-09-15).
+- **Konumsuz çark koruması:** `WheelInstance.base()` world null ise null döner (2026-09-15'te
+  1.21 testinde yakalandı: örnek çarklar `Bukkit.getWorld(null)` ile açılışı çökertiyordu).
+- **Yerel 1.21 testi:** `run/paper121/` (git'e girmez) — Paper 1.21.1 build 133 + JDK 21,
+  portsuz çakışma için 25566. Başlatma: Start-Process ile bağımsız (Start-Job oturumlar arası
+  ölüyor). İlk açılışta daily/premium/vote oluşur; pack+API localhost'tan doğrulanır.
+- **In-game editör KALDIRILDI (2026-09-15 akşamı):** HUD/dialog editörleri (`/wheel edit`,
+  `/wheel dialog`, `/wheel menu`, `/wheel ui`) silindi; `editor/`, `menu/` paketleri ve
+  `render/Ui2.java`, `UiCanvas.java`, `UiSprite.java`, `Glyphs.java` artık yok. Karar: karmaşık
+  ayarlar için tarayıcı arayüzü daha hızlı ve kaliteli; Sam's Wheel benzeri HUD denemsi bir gün
+  sürdü, merkezleme/kalibrasyon sorunlarıyla uğraşmak yerine web'e geçildi.
+  Paketteki `sunshinewheel:ui2` fontu ve dokuları artık kullanılmıyor (paketten temizlenebilir).
 
 ### Komutlar
 ```
-/wheel create <id>     yerlestirme modu (bloga sag tikla)
-/wheel move <id>       carki tasi
-/wheel edit <id>       panel editor (dunyada duran panel, bakisla imlec)
-/wheel dialog <id>     dialog editor (yazi girisi burada)
-/wheel menu            sandik menusu hizalama testi
-/wheel spin <id>       test cevirme
+/wheel web              web editor baglantisi uretir (tek kullanimlik, 10 dk)
+/wheel create <id>      yerlestirme modu (bloga sag tikla)
+/wheel move <id>        carki tasi
+/wheel spin <id>        test cevirme
 /wheel set <id> <ayar> <deger>
-/wheel tune <ayar> <deger>      panel/metin kalibrasyonu (restart gerekmez)
-/wheel ui <dx> <dy>             dialog panel resmi kaydirmasi
+/wheel tune <ayar> <deger>      metin kalibrasyonu (restart gerekmez)
 /wheel angle <id> <derece>      okun altindaki dilimi dogrulama
 /wheel list | remove | reload | cancel
 ```
@@ -110,18 +159,21 @@ Altyapısı kuruldu (`menu/ChestMenu.java`) ve çalışıyor. Kare ızgarası ö
 Tıklanan yerler sabit, hizalama kesin. **Ama** görünüm Minecraft'ın pikselli yazı tipiyle sınırlı ve
 kullanıcı bunu istemedi.
 
-### C) Display entity paneli (`/wheel edit`) — **doğru olan buydu**
-Dünyaya konan, oyuncuya dönük tek bir TextDisplay. İmleç, oyuncunun bakış ışınının panel düzlemiyle
-kesişiminden bulunuyor (`editor/EditorSession.java`). Sol tıkla butona basılıyor.
+### C) Display entity paneli (`/wheel edit`) — denendi, sonra terk edildi
+Önce dünyaya sabit panel + bakış ışını imleci, sonra kamera önü HUD + sanal imleç (`cursor-sensitivity`)
+denendi. Çalıştı ama görsel kalite ve karmaşık formlar (ödül listesi, renk/ikon seçici) için
+display-entity yaklaşımı çok emek istiyordu; merkezleme (yarım panel kayması) ve hareket hâlinde
+resim yeniden örneklemesi (bulanıklık) sorunları vardı. **2026-09-15: terk edildi, kaldırıldı.**
+Şu an tek arayüz tarayıcıdaki web editör.
 
-**Sam's Wheel'in yöntemi budur.** Kaynak: <https://docs.samscreations.eu/> — SamsRank'in
-"In-Game Editor" sayfasında aynen şöyle yazıyor: *"a revolutionary UI built entirely from display
-entities"* ve *"Move with your mouse to move the cursor. The cursor sensitivity can be adjusted in
-the config.yml"*.
+Sam's Wheel'in kendi yöntemi (dokümantasyondan): display entity'lerle in-world HUD, "look around to
+move the cursor", F ile kapat. Kaynak: <https://docs.samscreations.eu/> — *"a revolutionary UI built
+entirely from display entities"*, *"the UI is projected in front of your camera"*.
 
-> **Uyarı:** Bu yaklaşım bir kez yazılıp, ekran görüntülerine bakılarak "yanlış yol" sanılıp silindi;
-> sonra dokümanı okuyunca doğru olduğu anlaşılıp baştan yazıldı. Aynı hatayı tekrarlama —
-> **önce dokümanı oku.**
+### Neden web editör?
+- Gerçek formlar, kaydırıcılar, renk seçici, aranabilir eşya listesi; Türkçe dahil sınırsız metin.
+- Önizleme canvas'ta anında; oyuna girmeden düzenleme, kaydetmeden deneme.
+- API localhost'ta; arayüz dosyaları restart'sız güncellenebilir (`/var/www/wheel`).
 
 ### Sam's dokümanından çıkan diğer bilgiler (henüz uygulanmadı)
 - Görünüm modeli: `appearance.radius` (blok), `frame-color`, `hub-color`, `pointer-color`,
@@ -135,7 +187,7 @@ the config.yml"*.
 ## 4. Derleme ve yayınlama
 
 ```powershell
-# derleme (JDK 26 ile, Java 25 hedefli)
+# derleme (JDK 26 ile, Java 21 hedefli; Paper 1.21+ uyumluluğu için 1.21 API'ye karşı)
 $env:JAVA_HOME="C:\Program Files\Java\jdk-26.0.2"
 .\gradlew.bat build
 
@@ -144,16 +196,18 @@ python pack\art\generate_ui.py
 python pack\generate_pack.py 88 0 run\sunshinewheel-pack.zip
 ```
 
-Sunucuya yükleme için `scratchpad` klasöründeki scriptler kullanıldı:
-- `wheel_update.sh` — sadece jar günceller, Minecraft'ı yeniden başlatır (paket değişmediyse bu yeter).
-- `wheel_ui_deploy.sh` — paketi de günceller: canlı paketin **kopyasına** `assets/sunshinewheel/`
-  dosyalarını yazar, yeni sha1 hesaplar, `/var/www/rehber/pack-<sha1>.zip` olarak koyar,
-  Velocity ayarını çevirir, https üzerinden indirip sha1 doğrular, Oraxen kaynak klasörünü günceller.
+Sunucuya yükleme:
+- `wheel_update.sh` benzeri akış: jar'ı `/tmp`'ye at → `/home/minecraft/plugins/` içine kopyala →
+  `systemctl restart minecraft` (0 oyuncu iken yap; açılış ~3-4 dk sürüyor).
+- Web arayüzü: `web/index.html|style.css|app.js` → `/var/www/wheel/` (restart YOK, sadece kopyala).
+- nginx: `/etc/nginx/snippets/wheel.conf` + rehber server bloğunda include; `/wheel/` statik,
+  `/wheel/api/` → `127.0.0.1:8770`. Yedek: `/etc/nginx/sites-available/default.bak-wheel-*`.
 
 **Paket zinciri (önemli):** Oraxen paketi üretir → optimize edilmiş kopya `rehber.guldal.me`'de durur →
 Velocity `velocityresourcepacks/config.yml` içindeki url ve hash ile oyunculara gönderir.
 Yeni bir şey eklenince **Oraxen kaynak klasörüne de** kopyalanmalı, yoksa paket bir dahaki
-üretilişinde kaybolur.
+üretilişinde kaybolur. (Paketteki `sunshinewheel:ui2` artık kullanılmıyor; ilk paket yeniden
+üretiminde temizlenebilir.)
 
 **Geri alma:** Eski paket dosyaları silinmiyor. Velocity config'indeki hash'i eskisine çevirip
 `systemctl restart velocity` demek yeterli.
@@ -164,13 +218,20 @@ Yeni bir şey eklenince **Oraxen kaynak klasörüne de** kopyalanmalı, yoksa pa
 
 ## 5. Yapılacaklar
 
-1. Panelin görünümünü Sam's seviyesine çıkarmak (şu an sade; hizalama çalışıyor).
-2. Çarkın çevresine ödül adları ve yüzdeler (Sam'de var, bizde yok).
-3. Görünüm modelini Sam's gibi değiştirmek: blok cinsinden yarıçap + çerçeve/merkez/ok rengi + tasarım.
-4. Panelde imleç hassasiyeti ayarı.
-5. Örnek ödüller hâlâ **test modunda** — sadece mesaj gönderiyorlar, gerçek ödül vermiyorlar
-   (`WheelDefinition.withSampleRewards`). Canlıya alınırken komutları gerçek ödüllerle değiştir.
-6. Para kontrolü yok: ücret komutla alınıyor, bakiye kontrol edilmiyor (Vault bağlantısı gerekir).
+Plan/karar dosyası: `C:\CLLL\.opencode\plans\sunshinewheel-editor-hud.md` (HUD dönemi; geçmiş).
+
+1. ~~Çarkın çevresine ödül adları ve yüzdeler~~ — oyuncu önizlemesiyle (eğil+sağ tık, `/wheel preview`)
+   kapsandı; çark yüzüne yazı basılmadı (karışık görünürdü).
+2. ~~Görünüm renkleri~~ — çerçeve/merkez/ok rengi yapıldı. Kalan: 7 hazır PNG tema
+   (Sam's `wheel_2.png`…`wheel_12.png` tarzı); istenirse yapılır.
+3. Örnek ödüller hâlâ **test modunda** — sadece mesaj gönderiyorlar, gerçek ödül vermiyorlar.
+   Web editörden komutlar + `giveItem` ile gerçek ödüllere çevrilmeli.
+4. ~~Para kontrolü~~ — Vault bakiyeli para + XP maliyeti yapıldı.
+5. Web v2 fikirleri: ödül satırlarını sürükle-bırak sıralama, eşya ikonlarının gerçek görselleri,
+   işlem geçmişi (kim ne zaman kaydetti).
+6. Paketten `sunshinewheel:ui2` font/dokularının temizlenmesi (in-game editörle birlikte öksüz kaldı).
+7. NOT: `recordWin` iptal-sırası düzeltmesi kodda hazır ama henüz canlıda değil (bir sonraki
+   restart'ta çıkacak).
 
 ---
 
