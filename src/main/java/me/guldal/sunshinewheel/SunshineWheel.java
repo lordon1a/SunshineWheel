@@ -2,7 +2,6 @@ package me.guldal.sunshinewheel;
 
 import java.util.Objects;
 import me.guldal.sunshinewheel.papi.WheelPlaceholders;
-import me.guldal.sunshinewheel.web.PackServer;
 import me.guldal.sunshinewheel.web.WebServer;
 import me.guldal.sunshinewheel.wheel.WheelManager;
 import org.bukkit.command.PluginCommand;
@@ -12,7 +11,6 @@ public final class SunshineWheel extends JavaPlugin {
 
     private WheelManager manager;
     private WebServer web;
-    private PackServer pack;
 
     @Override
     public void onEnable() {
@@ -23,9 +21,6 @@ public final class SunshineWheel extends JavaPlugin {
 
         web = new WebServer(this, manager);
         web.start();
-
-        pack = new PackServer(this);
-        pack.start();
 
         WheelCommand command = new WheelCommand(manager, web);
         PluginCommand pluginCommand = Objects.requireNonNull(getCommand("wheel"), "plugin.yml'de wheel komutu yok");
@@ -48,9 +43,6 @@ public final class SunshineWheel extends JavaPlugin {
     public void onDisable() {
         if (web != null) {
             web.stop();
-        }
-        if (pack != null) {
-            pack.stop();
         }
         if (manager != null) {
             manager.despawnAll();

@@ -3,6 +3,9 @@
 A fortune-wheel plugin for Paper servers with a **web editor** — no client mods needed.
 Players walk up to a physical, animated wheel in the world, right-click to spin, and win prizes.
 
+**Setup guide (English, with screenshots): https://rehber.guldal.me/wheel-setup.html**
+(in-game: `/wheel web` also prints this link)
+
 ## Features
 
 - **Physical in-world wheels** — animated spins with easing styles, tick sounds and smooth motion
@@ -60,21 +63,21 @@ in `config.yml` for Turkish (`messages_tr.yml`). The web editor is English.
 
 ## Web editor hosting
 
-The plugin serves a JSON API on `127.0.0.1:8770` (see `web:` in `config.yml`).
-Proxy it over HTTPS, e.g. nginx:
+Nothing to install: the plugin serves the editor UI, the JSON API and the
+resource pack itself, all on one port (`web.port`, default `8770`).
 
-```nginx
-location /wheel/api/ {
-    limit_req zone=wheel_api burst=20 nodelay;
-    proxy_pass http://127.0.0.1:8770/api/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
+1. Open the port in your firewall: `ufw allow 8770/tcp` (Linux) — or allow it in
+   your host panel (Pterodactyl, Multicraft, …). Windows: see the command printed
+   at startup.
+2. Open `http://YOUR-SERVER-IP:8770/` and sign in with `/wheel web` from the game.
+   (Set `web.public-url` and the command gives a ready click-link instead.)
+3. For `server.properties`, use `http://YOUR-SERVER-IP:8770/pack.zip` as
+   `resource-pack` (sha1 is printed at startup). **Already using a resource pack?
+   Merge instead** — copy `assets/sunshinewheel` from the served `pack.zip` into
+   your own pack; Minecraft only supports one server pack at a time.
 
-Serve the `web/` folder as static files at `/wheel/` (no restart needed for UI updates).
+Prefer HTTPS? Keep `web.bind: 127.0.0.1` and proxy it with nginx — see
+`examples/nginx-wheel.conf` (static files in that case come from `web/`).
 
 ## Resource pack
 
@@ -86,8 +89,16 @@ The wheel is drawn with a tiny bundled font. The plugin builds `pack.zip`
 3. Restart. Done.
 
 Prefer merging? Download the same `pack.zip` and copy `assets/sunshinewheel`
-into your own pack instead. See `pack:` in `config.yml` to change the port
-or disable the built-in server.
+into your own pack instead. See `pack:` in `config.yml` to disable the built-in
+server (the editor keeps working; only `/pack.zip` goes 404).
+
+## What's in the release zip
+
+- `plugin/SunshineWheel-1.0.0.jar` — drop into `plugins/`
+- `web/` — static web-editor files; serve at `/wheel/` (see `examples/nginx-wheel.conf`)
+- `pack/sunshinewheel-pack.zip` — same pack the plugin serves; for manual merging
+- `examples/nginx-wheel.conf` + `examples/nginx-limits.conf` — copy-paste proxy config
+- `README.md`, `LICENSE`, `CHANGELOG.md`
 
 ## Build
 

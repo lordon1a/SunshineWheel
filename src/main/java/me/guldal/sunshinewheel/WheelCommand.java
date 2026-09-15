@@ -134,8 +134,17 @@ final class WheelCommand implements TabExecutor {
                     return msg(sender, Messages.mm("command.web-off"));
                 }
                 Player player = sender instanceof Player p ? p : null;
-                String link = web.createToken(player);
-                return msg(sender, Messages.mm("command.web-link", "link", link));
+                String token = web.createRawToken(player);
+                String base = web.publicUrl();
+                Component message = base.isBlank()
+                        ? Messages.mm("command.web-manual", "port", String.valueOf(web.port()), "token", token)
+                        : Messages.mm("command.web-link", "link", base + "#token=" + token);
+                String guide = web.guideUrl();
+                if (!guide.isBlank()) {
+                    message = message.append(Component.newline())
+                            .append(Messages.mm("command.web-guide", "guide", guide));
+                }
+                return msg(sender, message);
             }
             case "give" -> {
                 if (args.length < 4) {

@@ -59,6 +59,8 @@ command:
   reloaded: "<green>wheels.yml reloaded."
   web-off: "<red>Web API is off (config: web.enabled / web.port)."
   web-link: "<gold>Web editor link <gray>(valid 10 minutes, one use):</gray><newline><click:open_url:'{link}'><white>{link}</click>"
+  web-manual: "<gold>Web editor:<newline><gray>1) Open: <white>http://YOUR-SERVER-IP:{port}/</white><newline>2) Paste this key on the login screen:</gray><newline><white>{token}</white>"
+  web-guide: "<gray>Setup guide: <click:open_url:'{guide}'><white>{guide}</click>"
   give-usage: "<red>Usage: /wheel give <player> <wheel> <amount>"
   take-usage: "<red>Usage: /wheel take <player> <wheel> <amount>"
   bad-number: "<red>Invalid number."

@@ -30,11 +30,26 @@ tasks.processResources {
     filesMatching("plugin.yml") {
         expand("version" to project.version)
     }
+    // Web arayüzü jar'a gömülür; eklenti kendi servis eder (alıcı kurulumu yok).
+    from(layout.projectDirectory.dir("web")) {
+        into("web")
+    }
+}
+
+// Standalone resource pack for manual merging (same bytes the plugin serves).
+val mainOutput = sourceSets.main.get().output
+val compileCp = configurations.compileClasspath.get()
+tasks.register<JavaExec>("buildProductPack") {
+    dependsOn(tasks.compileJava)
+    classpath = mainOutput + compileCp
+    mainClass.set("me.guldal.sunshinewheel.web.PackTool")
+    args(layout.buildDirectory.dir("product-pack/sunshinewheel-pack.zip").get().asFile.absolutePath)
 }
 
 // Release paketi: jar + README + LICENSE + CHANGELOG (sunucu-özel dosya girmez).
 tasks.register<Zip>("releaseZip") {
     dependsOn(tasks.jar)
+    dependsOn("buildProductPack")
     archiveBaseName.set("SunshineWheel-release")
     archiveVersion.set(project.version.toString())
     from(layout.projectDirectory) {
@@ -42,6 +57,12 @@ tasks.register<Zip>("releaseZip") {
     }
     from(layout.projectDirectory.dir("web")) {
         into("web")
+    }
+    from(layout.projectDirectory.dir("examples")) {
+        into("examples")
+    }
+    from(layout.buildDirectory.dir("product-pack")) {
+        into("pack")
     }
     from(tasks.jar) {
         into("plugin")
