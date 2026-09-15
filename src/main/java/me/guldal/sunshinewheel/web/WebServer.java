@@ -7,11 +7,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
@@ -36,7 +38,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * JSON API embedded in the plugin. Binds to localhost only; exposed publicly via nginx HTTPS.
+ * JSON API + web editor + resource pack, all from one embedded server.
+ * Binds to localhost only by default; exposed publicly via nginx HTTPS, or set
+ * {@code web.bind} to {@code 0.0.0.0} for direct access (no extra setup needed).
  *
  * <p>Sign-in: {@code /wheel web} (in-game or console) creates a one-time key, the browser trades it
  * for a session at {@code POST /api/auth}. Sessions last 12 hours and are sent with the
@@ -50,6 +54,18 @@ public final class WebServer {
     private static final long SESSION_TTL_MS = 12 * 60 * 60 * 1000L;
     private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
 
+    /** Editor UI served straight from the jar (no files to host). */
+    private static final Map<String, String> UI_FILES = Map.of(
+            "/", "web/index.html",
+            "/index.html", "web/index.html",
+            "/style.css", "web/style.css",
+            "/app.js", "web/app.js");
+    private static final Map<String, String> UI_TYPES = Map.of(
+            "/", "text/html; charset=utf-8",
+            "/index.html", "text/html; charset=utf-8",
+            "/style.css", "text/css; charset=utf-8",
+            "/app.js", "application/javascript; charset=utf-8");
+
     public record Session(UUID playerId, String playerName, long expiresAt) {
     }
 
@@ -61,6 +77,10 @@ public final class WebServer {
     private HttpServer server;
     private ExecutorService executor;
     private String publicUrl = "https://rehber.guldal.me/wheel/";
+    private final Map<String, byte[]> uiCache = new ConcurrentHashMap<>();
+    private final RateLimiter rateLimiter = new RateLimiter();
+    private byte[] packBytes = new byte[0];
+    private String packSha1 = "";
 
     public WebServer(JavaPlugin plugin, WheelManager wheels) {
         this.plugin = plugin;
@@ -72,7 +92,7 @@ public final class WebServer {
             plugin.getLogger().info("Web API disabled (web.enabled: false).");
             return;
         }
-        String bind = plugin.getConfig().getString("web.bind", "127.0.0.1");
+        String bind = plugin.getConfig().getString("web.bind", "0.0.0.0");
         int port = plugin.getConfig().getInt("web.port", 8770);
         publicUrl = plugin.getConfig().getString("web.public-url", publicUrl);
         try {
@@ -82,6 +102,8 @@ public final class WebServer {
             return;
         }
         server.createContext("/api/", this::route);
+        server.createContext("/pack.zip", this::servePack);
+        server.createContext("/", this::serveUi);
         executor = Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "SunshineWheel-Web");
             thread.setDaemon(true);
@@ -90,14 +112,92 @@ public final class WebServer {
         server.setExecutor(executor);
         server.start();
         plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, this::pruneExpired, 20L * 300, 20L * 300);
-        plugin.getLogger().info("Web API ready: http://" + bind + ":" + port + "/api/ -> " + publicUrl);
+        buildPack();
+        String host = bind.equals("0.0.0.0") ? "<your-server-ip>" : bind;
+        plugin.getLogger().info("Web editor ready: http://" + host + ":" + port + "/"
+                + (publicUrl.isBlank() ? "" : " (link: " + publicUrl + ")"));
+        if (bind.equals("0.0.0.0")) {
+            plugin.getLogger().info("If the editor is unreachable, open the port in your firewall:");
+            plugin.getLogger().info("  Linux:   ufw allow " + port + "/tcp   (or your host panel)");
+            plugin.getLogger().info("  Windows: New-NetFirewallRule -DisplayName SunshineWheel -Direction Inbound -LocalPort " + port + " -Protocol TCP -Action Allow");
+        }
+        if (!packSha1.isEmpty()) {
+            plugin.getLogger().info("Resource pack ready: http://" + host + ":" + port + "/pack.zip");
+            plugin.getLogger().info("Put this in server.properties:  resource-pack=http://" + host + ":" + port + "/pack.zip");
+            plugin.getLogger().info("Put this in server.properties:  resource-pack-sha1=" + packSha1);
+        }
     }
 
-    /** Drops expired keys and sessions. */
+    private void buildPack() {
+        if (!plugin.getConfig().getBoolean("pack.enabled", true)) {
+            return;
+        }
+        try {
+            File file = new File(plugin.getDataFolder(), "pack.zip");
+            PackServer.buildPack(file);
+            packBytes = Files.readAllBytes(file.toPath());
+            packSha1 = PackServer.sha1(file);
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not build resource pack", e);
+        }
+    }
+
+    private void servePack(HttpExchange exchange) throws IOException {
+        try {
+            if (!exchange.getRequestMethod().equals("GET") || packBytes.length == 0) {
+                exchange.sendResponseHeaders(packBytes.length == 0 ? 404 : 405, -1);
+                return;
+            }
+            exchange.getResponseHeaders().set("Content-Type", "application/zip");
+            exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
+            exchange.sendResponseHeaders(200, packBytes.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(packBytes);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
+
+    private void serveUi(HttpExchange exchange) throws IOException {
+        try {
+            if (!exchange.getRequestMethod().equals("GET")) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+            String resource = UI_FILES.get(exchange.getRequestURI().getPath());
+            if (resource == null) {
+                exchange.sendResponseHeaders(404, -1);
+                return;
+            }
+            byte[] data = uiCache.get(resource);
+            if (data == null) {
+                try (var in = WebServer.class.getResourceAsStream("/" + resource)) {
+                    if (in == null) {
+                        exchange.sendResponseHeaders(404, -1);
+                        return;
+                    }
+                    data = in.readAllBytes();
+                }
+                uiCache.put(resource, data);
+            }
+            exchange.getResponseHeaders().set("Content-Type", UI_TYPES.get(exchange.getRequestURI().getPath()));
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+            exchange.sendResponseHeaders(200, data.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(data);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
+
+    /** Drops expired keys, sessions and rate-limit windows. */
     private void pruneExpired() {
         long now = System.currentTimeMillis();
         tokens.entrySet().removeIf(entry -> entry.getValue().expiresAt() < now);
         sessions.entrySet().removeIf(entry -> entry.getValue().expiresAt() < now);
+        rateLimiter.prune();
     }
 
     public void stop() {
@@ -117,14 +217,47 @@ public final class WebServer {
 
     /** Editor link: one-time key produced by the /wheel web command. */
     public String createToken(Player player) {
+        return publicUrl + "#token=" + createRawToken(player);
+    }
+
+    /** Raw one-time key (the command builds the message around it). */
+    public String createRawToken(Player player) {
         String token = random(24);
         long ttl = player == null ? 5 * 60 * 1000L : TOKEN_TTL_MS;
         tokens.put(token, new Session(player == null ? null : player.getUniqueId(),
                 player == null ? "konsol" : player.getName(), System.currentTimeMillis() + ttl));
-        return publicUrl + "#token=" + token;
+        return token;
+    }
+
+    public String publicUrl() {
+        return publicUrl;
+    }
+
+    public String guideUrl() {
+        return plugin.getConfig().getString("web.guide-url", "https://rehber.guldal.me/wheel-setup.html");
+    }
+
+    public int port() {
+        return plugin.getConfig().getInt("web.port", 8770);
+    }
+
+    /** Client IP, proxy-aware: X-Forwarded-For is trusted only from localhost. */
+    private static String clientIp(HttpExchange exchange) {
+        String remote = exchange.getRemoteAddress().getAddress().getHostAddress();
+        if (remote.equals("127.0.0.1") || remote.equals("0:0:0:0:0:0:0:1")) {
+            String forwarded = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",")[0].trim();
+            }
+        }
+        return remote;
     }
 
     private void route(HttpExchange exchange) throws IOException {
+        if (!rateLimiter.allow("all:" + clientIp(exchange), 120)) {
+            error(exchange, 429, "Too many requests. Slow down.");
+            return;
+        }
         try {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
@@ -218,6 +351,10 @@ public final class WebServer {
     }
 
     private void handleAuth(HttpExchange exchange) throws IOException {
+        if (!rateLimiter.allow("auth:" + clientIp(exchange), 10)) {
+            error(exchange, 429, "Too many requests. Slow down.");
+            return;
+        }
         JsonObject input = body(exchange);
         String token = string(input, "token", "");
         Session pending = tokens.remove(token);

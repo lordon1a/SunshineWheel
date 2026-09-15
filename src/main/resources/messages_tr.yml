@@ -58,6 +58,8 @@ command:
   reloaded: "<green>wheels.yml yeniden yüklendi."
   web-off: "<red>Web API kapalı (config: web.enabled / web.port)."
   web-link: "<gold>Web editör bağlantısı <gray>(10 dakika geçerli, tek kullanım):</gray><newline><click:open_url:'{link}'><white>{link}</click>"
+  web-manual: "<gold>Web editör:<newline><gray>1) Aç: <white>http://SUNUCU-IP:{port}/</white><newline>2) Giriş ekranına bu anahtarı yapıştır:</gray><newline><white>{token}</white>"
+  web-guide: "<gray>Kurulum rehberi: <click:open_url:'{guide}'><white>{guide}</click>"
   give-usage: "<red>Kullanım: /wheel give <oyuncu> <çark> <adet>"
   take-usage: "<red>Kullanım: /wheel take <oyuncu> <çark> <adet>"
   bad-number: "<red>Geçersiz sayı."

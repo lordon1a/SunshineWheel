@@ -1,6 +1,9 @@
 package me.guldal.sunshinewheel;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -33,7 +36,19 @@ public final class Messages {
         String lang = plugin.getConfig().getString("language", "en").toLowerCase(Locale.ROOT);
         String file = lang.equals("tr") ? "messages_tr.yml" : "messages.yml";
         plugin.saveResource(file, false);
-        messages = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), file));
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), file));
+        // Missing keys fall back to the bundled defaults, so updates never break existing files.
+        try (var in = plugin.getResource(file)) {
+            if (in != null) {
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(in, StandardCharsets.UTF_8));
+                config.setDefaults(defaults);
+                config.options().copyDefaults(true);
+            }
+        } catch (IOException ignored) {
+            // Okunamazsa dosyadaki değerlerle devam edilir.
+        }
+        messages = config;
     }
 
     /** Raw template with {placeholders} filled, MiniMessage tags untouched. */

@@ -12,7 +12,8 @@ Sunucu: Sunshine Survival (Minecraft Java 26.2, Paper + Velocity), `play.guldal.
 Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugins/SunshineWheel-1.0.0.jar`).
 Sürüm 1.0.0 (2026-09-15): Java 21 hedefi, Paper 1.21 API, messages.yml (EN/TR), örnek çarklar,
 paket otomatik servisi. Release zibi: `build/distributions/SunshineWheel-release-1.0.0.zip`
-(jar + README + LICENSE + CHANGELOG + web/). Değişiklik günlüğü: CHANGELOG.md.
+(jar + README + LICENSE + CHANGELOG + web/ + pack/sunshinewheel-pack.zip + examples/).
+GitHub Releases'te v1.0.0 (private): jar + tam zip. Değişiklik günlüğü: CHANGELOG.md.
 Faz 1 kullanıcı testinden geçti (çevirme/TR mesajlar/web düzenleme). Mağaza taslağı: STORE_LISTING.md.
 **BuiltByBit ilanı yayında** (2026-09-15 akşamı).
 
@@ -41,11 +42,19 @@ Faz 1 kullanıcı testinden geçti (çevirme/TR mesajlar/web düzenleme). Mağaz
   bilet tanınmazsa uyarı + kapalı sayma, bozuk isim koruması. Bilinen sınırlar: oturum 12 saat
   (çalınırsa TTL sonuna kadar geçerli), aynı anda iki admin yazarsa son yazan kazanır, restart
   bekleyen spin'i iptal eder (ücret iade edilir).
+- **Kurulum rehberi (EN):** https://rehber.guldal.me/wheel-setup.html (dosya: /var/www/rehber/
+  wheel-setup.html). `/wheel web` çıktısı ve README/listing bu linki gösterir; `web.guide-url`
+  ile değiştirilebilir. Messages artık jar varsayılanlarıyla birleşir (eksik anahtar = Missing
+  message hatası olmaz).
 - **Maliyet ve bilet, bekleme süresi, sesler, parçacıklar, hologram** ayarları var.
 - **Yerleştirme modu:** `/wheel create <id>` ve `/wheel move <id>` — sonra bir bloğa sağ tıklıyorsun.
   Zemine koyarsan üstünde durur, duvara koyarsan asılır.
-- **Web editör (asıl arayüz):** `https://rehber.guldal.me/wheel/` — eklenti içindeki JSON API
-  (`web/WebServer.java`, yalnızca 127.0.0.1:8770'e bağlanır) nginx ile HTTPS'e proxy'lenir.
+- **Web editör (asıl arayüz):** Tek gömülü sunucu (`web/WebServer.java`): `/` editör arayüzü
+  (jar içinden), `/api/*` JSON API, `/pack.zip` kaynak paketi — hepsi `web.bind:web.port` adresinde.
+  Alıcı kurulumu yok: `web.bind: 0.0.0.0` yapıp `http://IP:8770/` adresini açması yeterli.
+  Canlıda nginx HTTPS proxy (`/wheel/` → 127.0.0.1:8770) kullanılıyor; `web.bind` canlıda
+  açıkça 127.0.0.1'e sabitli (jar varsayılanı 0.0.0.0). Hız limiti eklenti içinde
+  (genel 120/dk, giriş 10/dk; localhost arkasında X-Forwarded-For okunur).
   Giriş: oyunda `/wheel web` → 10 dk geçerli tek kullanımlık anahtar → tarayıcıda oturum (12 saat).
   Arayüz `/var/www/wheel` altında statik dosyalar (index.html, app.js, style.css) — restart
   gerekmeden güncellenir. Düzen Sam's gibi: solda bölüm kenar çubuğu (General … Particles) +
@@ -230,8 +239,6 @@ Plan/karar dosyası: `C:\CLLL\.opencode\plans\sunshinewheel-editor-hud.md` (HUD 
 5. Web v2 fikirleri: ödül satırlarını sürükle-bırak sıralama, eşya ikonlarının gerçek görselleri,
    işlem geçmişi (kim ne zaman kaydetti).
 6. Paketten `sunshinewheel:ui2` font/dokularının temizlenmesi (in-game editörle birlikte öksüz kaldı).
-7. NOT: `recordWin` iptal-sırası düzeltmesi kodda hazır ama henüz canlıda değil (bir sonraki
-   restart'ta çıkacak).
 
 ---
 

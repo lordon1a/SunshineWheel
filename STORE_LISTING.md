@@ -36,6 +36,8 @@ and spin. No client mods. Configure everything from your browser with live previ
 
 ## Setup (5 minutes)
 
+Step-by-step guide with screenshots: **https://rehber.guldal.me/wheel-setup.html**
+
 1. Drop `SunshineWheel-1.0.0.jar` into `plugins/` and restart.
    Three sample wheels (`daily`, `premium`, `vote`) are created — place one with
    `/wheel move <id>`, then right-click a block.

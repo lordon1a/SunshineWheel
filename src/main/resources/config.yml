@@ -16,23 +16,28 @@ text-line-units: 10.0
 # Higher = smoother spin, but slightly more delayed.
 interpolation-ticks: 3
 
-# Web editor API. Binds to bind address only; exposed publicly via nginx HTTPS proxy.
+# Web editor + API + resource pack, all on one embedded server (no extra setup).
+# The editor UI is served from the jar itself at / (e.g. http://HOST:PORT/).
+# bind: 0.0.0.0 = reachable directly (zero setup; open the port in your firewall).
+#   127.0.0.1 = localhost only (use a reverse proxy for public HTTPS).
+# Abuse protection (rate limits + login keys) is built in, but for a public
+# server prefer the proxy for TLS — see examples/nginx-wheel.conf.
 # public-url: base of the editor link shown by /wheel web (must end with /).
-# Example: "https://example.com/wheel/"
+#   Blank = /wheel web prints the address + a paste-in key instead of a link.
+#   Example behind nginx: "https://example.com/wheel/"
+#   Example direct: "http://YOUR-SERVER-IP:8770/"
+# guide-url: setup guide shown by /wheel web (blank = hidden).
 web:
   enabled: true
-  bind: 127.0.0.1
+  bind: 0.0.0.0
   port: 8770
   public-url: ""
+  guide-url: "https://rehber.guldal.me/wheel-setup.html"
 
 # Built-in resource pack (the 1x1 pixel font the wheel is drawn with).
-# enabled: build pack.zip on startup and serve it over HTTP.
-# port/bind: where it listens. public-url: the address players download from
-# (blank = guess from bind/port). Put the URL + sha1 (printed at startup) into
+# The plugin builds pack.zip on startup and serves it at /pack.zip on the same
+# port as the web editor. Put the URL + sha1 (printed at startup) into
 # server.properties as resource-pack / resource-pack-sha1, or merge
 # assets/sunshinewheel from the served pack.zip into your own pack instead.
 pack:
   enabled: true
-  bind: 0.0.0.0
-  port: 8765
-  public-url: ""
