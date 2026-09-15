@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunshine Wheel Editor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="auth" class="auth hidden">
+  <div class="auth-card">
+    <h1>SUNSHINE <span>WHEEL</span></h1>
+    <p id="auth-message">To sign in, run <code>/wheel web</code> in-game and open the link you receive,
+      or paste the key below.</p>
+    <form id="auth-form" class="row">
+      <input id="auth-token" placeholder="Connection key" autocomplete="off">
+      <button type="submit" class="primary">Sign in</button>
+    </form>
+    <p class="dim">Keys are valid for 10 minutes and single-use. Sessions last 12 hours.</p>
+  </div>
+</div>
+
+<header id="topbar" class="hidden">
+  <div class="brand">SUNSHINE <span>WHEEL</span></div>
+  <div class="meta">
+    <span id="wheel-title" class="dim">—</span>
+    <span id="status" class="pill ok">ready</span>
+  </div>
+  <div class="actions">
+    <button id="delete" class="danger" title="Delete this wheel">Delete</button>
+    <button id="logout" class="ghost">Log out</button>
+  </div>
+</header>
+
+<main id="app" class="hidden">
+  <aside id="sidenav">
+    <div class="side-block">
+      <div class="side-head">
+        <h2>Wheels</h2>
+        <span id="wheel-count" class="dim"></span>
+      </div>
+      <ul id="wheel-list"></ul>
+      <form id="create-form" autocomplete="off">
+        <input id="create-id" placeholder="new-wheel-id" pattern="[a-z0-9_-]{1,32}">
+        <button type="submit">Add</button>
+      </form>
+    </div>
+    <nav id="side-nav" aria-label="Sections"></nav>
+    <button id="save" class="apply">⬇ Save &amp; apply</button>
+  </aside>
+
+  <section id="editor">
+    <div id="panels"></div>
+  </section>
+
+  <aside id="preview-pane">
+    <h2>Live Preview</h2>
+    <canvas id="preview" width="320" height="320"></canvas>
+    <div class="row-inline">
+      <button id="test-spin" class="primary">Test spin</button>
+      <span id="spin-result" class="dim"></span>
+    </div>
+    <div id="preview-info"></div>
+  </aside>
+</main>
+
+<div id="modal" class="hidden">
+  <div class="modal-card">
+    <h3 id="modal-title">Pick from inventory</h3>
+    <div id="modal-grid"></div>
+    <button id="modal-close">Close</button>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>

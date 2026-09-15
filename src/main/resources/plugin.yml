@@ -1,15 +1,16 @@
 name: SunshineWheel
 version: '${version}'
 main: me.guldal.sunshinewheel.SunshineWheel
-api-version: '26.2'
+api-version: '1.21'
 author: Sunshine Survival
-description: Oyun içi editörlü şans çarkı sistemi
+description: Wheel of fortune with a web editor
+softdepend: [Vault, PlaceholderAPI]
 commands:
   wheel:
-    description: Şans çarkı yönetimi
+    description: Wheel of fortune management
     aliases: [cark]
     permission: sunshinewheel.admin
 permissions:
   sunshinewheel.admin:
-    description: Çark oluşturma, düzenleme ve test komutları
+    description: Wheel creation and management commands
     default: op

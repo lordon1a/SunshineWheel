@@ -1,8 +1,9 @@
 package me.guldal.sunshinewheel;
 
 import java.util.Objects;
-import me.guldal.sunshinewheel.editor.DialogEditor;
-import me.guldal.sunshinewheel.editor.EditorManager;
+import me.guldal.sunshinewheel.papi.WheelPlaceholders;
+import me.guldal.sunshinewheel.web.PackServer;
+import me.guldal.sunshinewheel.web.WebServer;
 import me.guldal.sunshinewheel.wheel.WheelManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -10,29 +11,46 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class SunshineWheel extends JavaPlugin {
 
     private WheelManager manager;
-    private EditorManager editors;
+    private WebServer web;
+    private PackServer pack;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        Messages.init(this);
         manager = new WheelManager(this);
         manager.load();
-        DialogEditor dialogs = new DialogEditor(manager);
-        editors = new EditorManager(this, manager, dialogs);
 
-        WheelCommand command = new WheelCommand(manager, dialogs, editors);
+        web = new WebServer(this, manager);
+        web.start();
+
+        pack = new PackServer(this);
+        pack.start();
+
+        WheelCommand command = new WheelCommand(manager, web);
         PluginCommand pluginCommand = Objects.requireNonNull(getCommand("wheel"), "plugin.yml'de wheel komutu yok");
         pluginCommand.setExecutor(command);
         pluginCommand.setTabCompleter(command);
 
-        getServer().getPluginManager().registerEvents(new WheelListener(this, manager, dialogs, editors), this);
+        getServer().getPluginManager().registerEvents(new WheelListener(this, manager), this);
         manager.spawnAll();
+
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new WheelPlaceholders(manager, getPluginMeta().getVersion()).register();
+            getLogger().info("PlaceholderAPI hooked: %sunshinewheel_*% active.");
+        }
+        if (getServer().getPluginManager().getPlugin("Vault") != null) {
+            getLogger().info("Vault hooked: money costs enabled.");
+        }
     }
 
     @Override
     public void onDisable() {
-        if (editors != null) {
-            editors.closeAll();
+        if (web != null) {
+            web.stop();
+        }
+        if (pack != null) {
+            pack.stop();
         }
         if (manager != null) {
             manager.despawnAll();

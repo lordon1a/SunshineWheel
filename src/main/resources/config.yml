@@ -1,22 +1,38 @@
-# Piksel metin kalibrasyonu. Çark ya da editör ekranı oyunda kaymış veya yanlış boyutta
-# görünürse /wheel tune ile canlı ayarla; değerler buraya kaydedilir.
+# Interface language for in-game messages: en (English) or tr (Türkçe).
+# The web editor is always English.
+language: en
+
+# Pixel text calibration. If a wheel looks shifted or wrongly sized in-game,
+# adjust live with /wheel tune; values are saved here.
 #
-# text-pixel-blocks: scale=1 iken bir font pikselinin blok cinsinden boyu.
-# text-top-units:    görüntünün üst kenarının TextDisplay kökenine göre yüksekliği (font pikseli).
-# text-line-units:   bir metin satırının yüksekliği (font pikseli); görüntüyü ortalamak için kullanılır.
+# text-pixel-blocks: world size of one font pixel at scale 1.
+# text-top-units:    top edge of the image relative to the TextDisplay origin (font pixels).
+# text-line-units:   height of one text line (font pixels); used to center the image.
 text-pixel-blocks: 0.025
 text-top-units: 3.0
 text-line-units: 10.0
 
-# Dönüş sırasında her tick gönderilen güncellemenin istemcide kaç tick'e yayılacağı.
-# Büyüdükçe dönüş daha akıcı ama biraz daha gecikmeli görünür.
+# How many ticks the client spreads each per-tick update over while spinning.
+# Higher = smoother spin, but slightly more delayed.
 interpolation-ticks: 3
 
-# Dünyadaki çarkın yanındaki eski panel ayarları (kullanılmıyor, ileride lazım olabilir).
-panel-pixel-blocks: 0.018
-panel-distance: 2.6
+# Web editor API. Binds to bind address only; exposed publicly via nginx HTTPS proxy.
+# public-url: base of the editor link shown by /wheel web (must end with /).
+# Example: "https://example.com/wheel/"
+web:
+  enabled: true
+  bind: 127.0.0.1
+  port: 8770
+  public-url: ""
 
-# Editör ekranındaki panel resminin kaydırması (GUI pikseli).
-# Panel butonlarla hizasızsa oyun içinde: /wheel ui <dx> <dy>
-ui-offset-x: 0
-ui-offset-y: 0
+# Built-in resource pack (the 1x1 pixel font the wheel is drawn with).
+# enabled: build pack.zip on startup and serve it over HTTP.
+# port/bind: where it listens. public-url: the address players download from
+# (blank = guess from bind/port). Put the URL + sha1 (printed at startup) into
+# server.properties as resource-pack / resource-pack-sha1, or merge
+# assets/sunshinewheel from the served pack.zip into your own pack instead.
+pack:
+  enabled: true
+  bind: 0.0.0.0
+  port: 8765
+  public-url: ""
