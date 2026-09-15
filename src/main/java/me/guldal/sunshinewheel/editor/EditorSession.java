@@ -39,6 +39,7 @@ public final class EditorSession {
     private final Location anchor;
 
     private TextDisplay display;
+    private TextDisplay previewDisplay;
     private BukkitTask task;
     private int hovered = -1;
     private int cursorX = -1;
@@ -75,10 +76,25 @@ public final class EditorSession {
             td.setBrightness(new Display.Brightness(15, 15));
             td.setViewRange(1.0f);
         });
+        // Canlı önizleme ayrı bir display'dir: sadece ödüller/renkler değişince yeniden kodlanır.
+        float scale = (float) (settings.panelPixelBlocks / settings.textPixelBlocks);
+        previewDisplay = anchor.getWorld().spawn(anchor, TextDisplay.class, td -> {
+            td.setPersistent(false);
+            td.setBillboard(Display.Billboard.CENTER);
+            td.setLineWidth(Integer.MAX_VALUE / 2);
+            td.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
+            td.setShadowed(false);
+            td.setSeeThrough(false);
+            td.setBrightness(new Display.Brightness(15, 15));
+            td.setViewRange(1.0f);
+            td.text(PixelText.pad(panel.previewComponent(), settings.padLines(EditorPanel.PREVIEW_IMG_SIZE)));
+            td.setTransformation(new Transformation(new Vector3f(), new Quaternionf(),
+                    new Vector3f(scale), new Quaternionf()));
+        });
         redraw();
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 2L, 2L);
         player.sendMessage(MM.deserialize("<gold>Editör açık.</gold> <gray>Panele bak, imleci fareyle gezdir, "
-                + "sol tıkla bas. Kapatmak: shift ya da KAPAT."));
+                + "sol tıkla bas. Tekerlek = kaydırıcı, F = kapat."));
     }
 
     private void tick() {
@@ -88,6 +104,7 @@ public final class EditorSession {
             close();
             return;
         }
+        positionPreview();
         int[] cursor = cursor();
         int x = cursor == null ? -1 : cursor[0];
         int y = cursor == null ? -1 : cursor[1];
@@ -139,7 +156,11 @@ public final class EditorSession {
                     && cursor[1] >= 0 && cursor[1] < EditorPanel.IMG_H;
         }
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.4f);
-        button.run();
+        if (index == 10) {
+            panel.sliderToCursor(cursor[0]);   // kaydırıcı: tıklanan yere atlar
+        } else {
+            button.run();
+        }
         hovered = index;
         redraw();
         return true;
@@ -160,15 +181,52 @@ public final class EditorSession {
         wheels.respawn(wheel);
     }
 
+    /**
+     * Önizleme display'ini panelin sağ kutusuna konumlandırır. Panel oyuncuya döndüğü için kaydırma
+     * yönü her tick oyuncunun sağ vektöründen yeniden hesaplanır (paket maliyeti ~50 byte).
+     */
+    private void positionPreview() {
+        if (previewDisplay == null || !previewDisplay.isValid()) {
+            return;
+        }
+        org.bukkit.util.Vector look = player.getEyeLocation().getDirection();
+        org.bukkit.util.Vector right = look.getCrossProduct(new org.bukkit.util.Vector(0, 1, 0));
+        if (right.lengthSquared() < 1.0e-6) {
+            right = new org.bukkit.util.Vector(1, 0, 0);
+        } else {
+            right.normalize();
+        }
+        double px = settings.panelPixelBlocks;
+        double dx = (EditorPanel.PREVIEW_CENTER_X - EditorPanel.IMG_W / 2.0) * px;
+        double dy = (EditorPanel.PREVIEW_CENTER_Y - EditorPanel.IMG_H / 2.0) * px;
+        float scale = (float) (px / settings.textPixelBlocks);
+        previewDisplay.setTransformation(new Transformation(
+                new Vector3f((float) (right.getX() * dx + look.getX() * 0.02),
+                        (float) (-dy + right.getY() * dx + look.getY() * 0.02),
+                        (float) (right.getZ() * dx + look.getZ() * 0.02)),
+                new Quaternionf(), new Vector3f(scale), new Quaternionf()));
+    }
+
     public void redraw() {
         if (display == null || !display.isValid()) {
             return;
         }
         float scale = (float) (settings.panelPixelBlocks / settings.textPixelBlocks);
         double centerY = settings.imageCenterY(EditorPanel.IMG_H, settings.panelPixelBlocks);
-        display.text(PixelText.encode(panel.render(hovered, cursorX, cursorY), settings.padLines(EditorPanel.IMG_H)));
+        display.text(PixelText.pad(panel.render(hovered, cursorX, cursorY), settings.padLines(EditorPanel.IMG_H)));
         display.setTransformation(new Transformation(
                 new Vector3f(0, (float) -centerY, 0), new Quaternionf(), new Vector3f(scale), new Quaternionf()));
+    }
+
+    /** Fare tekerleği: kaydırıcı ince ayarı. Panele denk geldiyse true döner (hotbar değişmesin). */
+    public boolean scroll(int direction) {
+        int[] cursor = cursor();
+        if (cursor == null) {
+            return false;
+        }
+        panel.scroll(cursor[0], cursor[1], direction);
+        redraw();
+        return true;
     }
 
     public void close() {
@@ -179,6 +237,10 @@ public final class EditorSession {
         if (display != null) {
             display.remove();
             display = null;
+        }
+        if (previewDisplay != null) {
+            previewDisplay.remove();
+            previewDisplay = null;
         }
     }
 }

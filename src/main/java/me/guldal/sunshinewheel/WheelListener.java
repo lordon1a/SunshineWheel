@@ -20,7 +20,9 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -128,6 +130,33 @@ final class WheelListener implements Listener {
     public void onSneak(PlayerToggleSneakEvent event) {
         if (event.isSneaking() && editors.close(event.getPlayer().getUniqueId())) {
             event.getPlayer().sendActionBar(MM.deserialize("<gray>Editör kapatıldı."));
+        }
+    }
+
+    /** F (el değiştirme) editörü kapatır — Sam's Wheel'deki gibi. */
+    @EventHandler
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        if (editors.close(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(MM.deserialize("<gray>Editör kapatıldı."));
+        }
+    }
+
+    /** Fare tekerleği: imleç kaydırıcının üzerindeyken değeri ince ayar yapar. */
+    @EventHandler
+    public void onHeldSlotChange(PlayerItemHeldEvent event) {
+        EditorSession session = editors.session(event.getPlayer().getUniqueId());
+        if (session == null) {
+            return;
+        }
+        int diff = event.getNewSlot() - event.getPreviousSlot();
+        if (diff > 1) {
+            diff = -1;      // 8 -> 0 sarmalaması
+        } else if (diff < -1) {
+            diff = 1;
+        }
+        if (diff != 0 && session.scroll(diff)) {
+            event.setCancelled(true);
         }
     }
 

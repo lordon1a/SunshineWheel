@@ -108,6 +108,78 @@ public final class PixelText {
         return root.build();
     }
 
+    /**
+     * Görüntüyü <b>mevcut satırın içine</b> (offsetX, offsetY) konumuna yerleştirir ve satırın net
+     * ilerlemesini değiştirmez. Satır gliflerinin ascent'i {@code 1 - satır} olduğu için görüntünün üst
+     * kenarı tam olarak offsetY pikselinde durur; böylece panelde önizleme/imleç gibi küçük parçalar
+     * satır atlamadan istenen yere konabilir.
+     */
+    public static Component encodeAt(PixelImage image, int offsetX, int offsetY) {
+        if (offsetY < 0 || offsetY + image.height > MAX_ROWS) {
+            throw new IllegalArgumentException("Görüntü satır aralığının dışında: " + offsetY + "+" + image.height);
+        }
+        TextComponent.Builder root = Component.text().font(FONT);
+        StringBuilder spaces = new StringBuilder();
+        if (offsetX > 0) {
+            appendSpace(spaces, offsetX);
+        }
+        int cursor = 0;
+        for (int y = 0; y < image.height; y++) {
+            char glyph = (char) (ROW_GLYPH_BASE + offsetY + y);
+            int pendingTransparent = 0;
+            int x = 0;
+            while (x < image.width) {
+                int color = image.get(x, y);
+                int run = 1;
+                while (x + run < image.width && image.get(x + run, y) == color) {
+                    run++;
+                }
+                if (PixelImage.isTransparent(color)) {
+                    pendingTransparent += run;
+                } else {
+                    if (pendingTransparent > 0) {
+                        appendSpace(spaces, pendingTransparent);
+                        cursor += pendingTransparent;
+                        pendingTransparent = 0;
+                    }
+                    flush(root, spaces);
+                    StringBuilder pixels = new StringBuilder(run * 2);
+                    for (int i = 0; i < run; i++) {
+                        pixels.append(glyph).append(NEG_SPACE_BASE);
+                    }
+                    root.append(Component.text(pixels.toString(), TextColor.color(color & 0xFFFFFF)));
+                    cursor += run;
+                }
+                x += run;
+            }
+            if (cursor > 0) {
+                appendSpace(spaces, -cursor);
+                cursor = 0;
+            }
+        }
+        if (offsetX > 0) {
+            appendSpace(spaces, -offsetX);   // net ilerleme sıfır kalsın
+        }
+        flush(root, spaces);
+        return root.build();
+    }
+
+    /**
+     * Mevcut bileşenin altına boş satır ekler. TextDisplay metni kökenden yukarı doğru büyüdüğü için
+     * bu satırlar görüntüyü yukarı iter; görüntü merkezini kökene yaklaştırır.
+     */
+    public static Component pad(Component base, int lines) {
+        if (lines <= 0) {
+            return base;
+        }
+        TextComponent.Builder root = Component.text();
+        root.append(base);
+        for (int i = 0; i < lines; i++) {
+            root.append(Component.text("\n" + (char) POS_SPACE_BASE + NEG_SPACE_BASE).font(FONT));
+        }
+        return root.build();
+    }
+
     /** Verilen kadar yatay ilerleme sağlayan boşluk karakterleri (negatif değer geri alır). */
     public static String space(int advance) {
         StringBuilder out = new StringBuilder();
