@@ -81,7 +81,7 @@ In-game messages live in `messages.yml` — translate them freely; Turkish is in
 
 ## Support
 
-[Discord invite link] — support + suggestions. Updates and changelog with every release.
+https://discord.gg/HZEu79G8m — support + suggestions. Updates and changelog with every release.
 
 ## License
 

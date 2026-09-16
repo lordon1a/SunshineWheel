@@ -41,3 +41,11 @@ web:
 # assets/sunshinewheel from the served pack.zip into your own pack instead.
 pack:
   enabled: true
+  # Pack format for pack.mcmeta. 0 = auto-detect from the running server version.
+  format: 0
+
+# Update checker: fetches a small JSON asynchronously (never blocks the server)
+# and notifies admins in-game when a newer version exists.
+update-checker:
+  enabled: true
+  url: "https://rehber.guldal.me/wheel-version.json"

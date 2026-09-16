@@ -19,7 +19,7 @@ public final class PackTool {
         if (out.getParentFile() != null) {
             out.getParentFile().mkdirs();
         }
-        PackServer.buildPack(out);
+        PackServer.buildPack(out, 34);
         System.out.println("pack written: " + out + " (" + out.length() + " bytes)");
     }
 }
