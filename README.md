@@ -6,6 +6,8 @@ Players walk up to a physical, animated wheel in the world, right-click to spin,
 **Setup guide (English, with screenshots): https://rehber.guldal.me/wheel-setup.html**
 (in-game: `/wheel web` also prints this link)
 
+**Support: https://discord.gg/HZEu79G8m**
+
 ## Features
 
 - **Physical in-world wheels** — animated spins with easing styles, tick sounds and smooth motion

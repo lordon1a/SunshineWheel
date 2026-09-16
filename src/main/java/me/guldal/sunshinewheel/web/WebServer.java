@@ -134,7 +134,7 @@ public final class WebServer {
         }
         try {
             File file = new File(plugin.getDataFolder(), "pack.zip");
-            PackServer.buildPack(file);
+            PackServer.buildPack(file, PackServer.packFormat(plugin));
             packBytes = Files.readAllBytes(file.toPath());
             packSha1 = PackServer.sha1(file);
         } catch (IOException e) {

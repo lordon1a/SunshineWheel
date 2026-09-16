@@ -80,3 +80,5 @@ verb:
   added: "eklendi"
   taken: "alındı"
   given: "verildi"
+update:
+  available: "<gold>SunshineWheel <white>{latest}</white> <gray>sürümü çıktı (sende <white>{current}</white>).</gray> <click:open_url:'{url}'><white><u>İndir</u></click>"

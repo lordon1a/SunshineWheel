@@ -1,9 +1,10 @@
 plugins {
     java
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "me.guldal"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -17,6 +18,22 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
+    // Gömülür ve relocate edilir (metrics).
+    implementation("org.bstats:bstats-bukkit:3.2.1")
+}
+
+tasks.shadowJar {
+    archiveClassifier.set("")
+    relocate("org.bstats", "me.guldal.sunshinewheel.libs.bstats")
+}
+
+// Dağıtımda tek jar: shadowJar, normal jar yerine geçer.
+tasks.jar {
+    enabled = false
+}
+
+tasks.build {
+    dependsOn(tasks.shadowJar)
 }
 
 // Alıcılar Java 21+ kullanır; bu bilgisayardaki JDK 26 ile Java 21 hedefli derliyoruz.
@@ -48,7 +65,7 @@ tasks.register<JavaExec>("buildProductPack") {
 
 // Release paketi: jar + README + LICENSE + CHANGELOG (sunucu-özel dosya girmez).
 tasks.register<Zip>("releaseZip") {
-    dependsOn(tasks.jar)
+    dependsOn(tasks.shadowJar)
     dependsOn("buildProductPack")
     archiveBaseName.set("SunshineWheel-release")
     archiveVersion.set(project.version.toString())
@@ -64,7 +81,7 @@ tasks.register<Zip>("releaseZip") {
     from(layout.buildDirectory.dir("product-pack")) {
         into("pack")
     }
-    from(tasks.jar) {
+    from(tasks.shadowJar) {
         into("plugin")
     }
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -72,7 +89,7 @@ tasks.register<Zip>("releaseZip") {
 
 // Yerel test sunucusuna kopyala: gradlew deployLocal
 tasks.register<Copy>("deployLocal") {
-    dependsOn(tasks.jar)
-    from(tasks.jar)
+    dependsOn(tasks.shadowJar)
+    from(tasks.shadowJar)
     into(layout.projectDirectory.dir("run/plugins"))
 }

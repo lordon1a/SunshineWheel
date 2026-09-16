@@ -9,11 +9,14 @@ Sunucu: Sunshine Survival (Minecraft Java 26.2, Paper + Velocity), `play.guldal.
 
 ## 1. Şu an ne çalışıyor
 
-Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugins/SunshineWheel-1.0.0.jar`).
-Sürüm 1.0.0 (2026-09-15): Java 21 hedefi, Paper 1.21 API, messages.yml (EN/TR), örnek çarklar,
-paket otomatik servisi. Release zibi: `build/distributions/SunshineWheel-release-1.0.0.zip`
-(jar + README + LICENSE + CHANGELOG + web/ + pack/sunshinewheel-pack.zip + examples/).
-GitHub Releases'te v1.0.0 (private): jar + tam zip. Değişiklik günlüğü: CHANGELOG.md.
+Plugin canlı sunucuda kurulu ve hatasız çalışıyor (`/home/minecraft/plugins/SunshineWheel-1.1.0.jar`).
+Sürüm 1.1.0 (2026-09-16): bStats (Shade+relocate, ID henüz 0 — bstats.org kaydı sonrası
+`SunshineWheel.BSTATS_PLUGIN_ID` doldurulacak), güncelleme bildirici
+(`https://rehber.guldal.me/wheel-version.json`; yeni sürümde JSON'u güncelle), paket formatı
+çalışan sürümden hesaplanır (`pack.format: 0`), Discord linki her yerde
+(https://discord.gg/HZEu79G8m). Release zibi: `build/distributions/SunshineWheel-release-1.1.0.zip`;
+GitHub Releases'te v1.0.0 + v1.1.0 (private). Changelog: CHANGELOG.md. Kurulum rehberi:
+https://rehber.guldal.me/wheel-setup.html (dosya /var/www/rehber/wheel-setup.html).
 Faz 1 kullanıcı testinden geçti (çevirme/TR mesajlar/web düzenleme). Mağaza taslağı: STORE_LISTING.md.
 **BuiltByBit ilanı yayında** (2026-09-15 akşamı).
 

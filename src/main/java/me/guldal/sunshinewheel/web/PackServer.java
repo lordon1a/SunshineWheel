@@ -22,23 +22,39 @@ import java.util.zip.ZipOutputStream;
  */
 public final class PackServer {
 
-    /** Baseline format for 1.21–1.21.1; newer clients show a warning but still apply it. */
-    private static final int PACK_FORMAT = 34;
     private static final int ROWS = 256;
     private static final int SPACE_BITS = 11;
 
     private PackServer() {
     }
 
+    /** Pack format for the running server (1.21 → 1.21.9 table, 26.x → 88); unknown falls back to 34. */
+    public static int packFormat(org.bukkit.plugin.java.JavaPlugin plugin) {
+        int override = plugin.getConfig().getInt("pack.format", 0);
+        if (override > 0) {
+            return override;
+        }
+        String version = org.bukkit.Bukkit.getBukkitVersion().split("-")[0];
+        return switch (version) {
+            case "1.21", "1.21.1" -> 34;
+            case "1.21.2", "1.21.3" -> 42;
+            case "1.21.4" -> 46;
+            case "1.21.5" -> 55;
+            case "1.21.6" -> 63;
+            case "1.21.7", "1.21.8", "1.21.9" -> 64;
+            default -> version.startsWith("26.") ? 88 : 34;
+        };
+    }
+
     /** Builds the standalone resource pack (also used at runtime on startup). */
-    public static void buildPack(File out) throws IOException {
+    public static void buildPack(File out, int packFormat) throws IOException {
         if (out.getParentFile() != null) {
             out.getParentFile().mkdirs();
         }
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(out.toPath()))) {
             zip.setLevel(9);
             writeEntry(zip, "pack.mcmeta",
-                    ("{\"pack\":{\"description\":\"SunshineWheel wheel font\",\"pack_format\":" + PACK_FORMAT + "}}")
+                    ("{\"pack\":{\"description\":\"SunshineWheel wheel font\",\"pack_format\":" + packFormat + "}}")
                             .getBytes(StandardCharsets.UTF_8));
             writeEntry(zip, "assets/sunshinewheel/font/px.json", pxFontJson().getBytes(StandardCharsets.UTF_8));
             writeEntry(zip, "assets/sunshinewheel/textures/font/px.png", whitePixelPng());

@@ -81,3 +81,5 @@ verb:
   added: "added"
   taken: "taken"
   given: "given"
+update:
+  available: "<gold>SunshineWheel <white>{latest}</white> <gray>is available (you have <white>{current}</white>).</gray> <click:open_url:'{url}'><white><u>Download</u></click>"
