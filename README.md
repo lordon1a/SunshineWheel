@@ -1,13 +1,15 @@
-# SunshineWheel
+# SunshineWheel: Spin Wheel Plugin for Minecraft (Paper 1.21+)
 
-Open-source prize wheels for Paper 1.21+. You place a wheel somewhere in your world,
-fill it with rewards from a browser editor, and players right-click it to spin.
-Everything is drawn with display entities and a tiny font pack that the plugin
-builds and hosts for you, so players don't need any mods.
+A free, open-source **spin wheel / lucky wheel / prize wheel** plugin for Minecraft Paper
+servers. You place a real, animated wheel in your world, fill it with rewards from a browser
+editor, and players right-click it to spin. Use it for daily rewards, vote rewards, crate-style
+prizes and events. Everything is drawn with display entities and a tiny font pack that the
+plugin builds and hosts for you, so players don't need any mods.
 
-[Setup guide with screenshots](https://rehber.guldal.me/wheel-setup.html) ·
+[Setup guide](https://rehber.sunshine-mc.net/wheel-setup.html) ·
+[Download](https://github.com/lordon1a/SunshineWheel/releases/latest) ·
 [Discord](https://discord.gg/HZEu79G8m) ·
-[Changelog](CHANGELOG.md)
+[Changelog](https://github.com/lordon1a/SunshineWheel/blob/master/CHANGELOG.md)
 
 ## Quick start
 
@@ -86,7 +88,7 @@ its JSON API and `pack.zip`.
 - Open the port in your firewall or host panel. Then visit `http://YOUR-IP:8770/` and
   paste the key from `/wheel web`.
 - For HTTPS, keep `web.bind: 127.0.0.1` and put nginx in front of it. A ready config is
-  in [`examples/nginx-wheel.conf`](examples/nginx-wheel.conf).
+  in [`examples/nginx-wheel.conf`](https://github.com/lordon1a/SunshineWheel/blob/master/examples/nginx-wheel.conf).
 - Already using a server resource pack? Copy `assets/sunshinewheel` from the generated
   `pack.zip` into your own pack, because a server can only send one pack.
 
@@ -97,6 +99,15 @@ ended with the logout button.
 
 In-game messages are in `messages.yml` (English). Set `language: tr` in `config.yml`
 to use Turkish. The web editor is in English.
+
+## Network and privacy
+
+- The update checker downloads one small JSON file from `rehber.sunshine-mc.net` every
+  6 hours to tell admins about new versions. It sends no player or server data. Turn it off
+  with `update-checker.enabled: false`.
+- The web editor and `pack.zip` are served by the plugin on your own server (`web.port`).
+  Nothing is uploaded anywhere else.
+- No analytics or metrics are collected.
 
 ## Building from source
 
@@ -114,4 +125,4 @@ and test the change on a Paper server.
 
 ## License
 
-[MIT](LICENSE). You can use it, change it and ship it on your server for free.
+[MIT](https://github.com/lordon1a/SunshineWheel/blob/master/LICENSE). You can use it, change it and ship it on your server for free.
