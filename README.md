@@ -11,6 +11,8 @@ plugin builds and hosts for you, so players don't need any mods.
 [Discord](https://discord.gg/4fmZUfqnHw) ·
 [Changelog](https://github.com/lordon1a/SunshineWheel/blob/master/CHANGELOG.md)
 
+![SunshineWheel spin wheel](docs/media/1_hero.png)
+
 ## Quick start
 
 1. Put the jar in `plugins/` and restart. You need Paper 1.21 or newer and Java 21.
