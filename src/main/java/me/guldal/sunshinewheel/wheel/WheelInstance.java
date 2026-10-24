@@ -1,15 +1,18 @@
 package me.guldal.sunshinewheel.wheel;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import me.guldal.sunshinewheel.Messages;
 import me.guldal.sunshinewheel.api.WheelSpinStartEvent;
 import me.guldal.sunshinewheel.api.WheelSpinWinEvent;
+import me.guldal.sunshinewheel.integration.CustomItems;
 import me.guldal.sunshinewheel.render.PixelImage;
 import me.guldal.sunshinewheel.render.PixelText;
 import me.guldal.sunshinewheel.render.WheelArt;
@@ -20,6 +23,7 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
@@ -48,6 +52,8 @@ public final class WheelInstance {
     private static final MiniMessage MM = MiniMessage.miniMessage();
     private static final int POINTER_W = 13;
     private static final int POINTER_H = 15;
+    /** Klasik 128px çark ~1700 parça ve sorunsuz; deluxe için güvenli üst sınır. */
+    private static final int MAX_DELUXE_RUNS = 4500;
 
     private final Plugin plugin;
     private final WheelManager wheels;
@@ -64,6 +70,10 @@ public final class WheelInstance {
     /** Devam eden çevirmenin ücreti; yarıda kesilirse iade edilir. */
     private UUID spinner;
     private Charge pendingCharge;
+
+    /** Tekrarlayan uyarıları önlemek için (ödül adı / kaynak anahtarı). */
+    private final Set<String> warnedNoPayout = new HashSet<>();
+    private final Set<String> warnedUnresolved = new HashSet<>();
 
     private double angle;
     private boolean spinning;
@@ -119,18 +129,35 @@ public final class WheelInstance {
         float scale = (float) scale();
 
         List<Integer> colors = visibleRewards().stream().map(r -> r.color).toList();
-        PixelImage wheelImage = WheelArt.wheel(colors, def.imageSize, def.frameColor, def.hubColor);
+        boolean deluxe = !"classic".equals(def.artStyle);
+        PixelImage wheelImage = null;
+        if (deluxe) {
+            wheelImage = WheelArt.wheelDeluxe(colors, boundaries(), def.imageSize, def.frameColor, def.hubColor);
+            int runs = WheelArt.runCount(wheelImage);
+            if (runs > MAX_DELUXE_RUNS) {
+                // İstemci çok parçalı metni çizmiyor; güvenli klasik çizime düş.
+                plugin.getLogger().warning("Wheel '" + def.id + "': deluxe art too detailed (" + runs
+                        + " runs > " + MAX_DELUXE_RUNS + "), using classic art. Lower appearance.image-size.");
+                wheelImage = null;
+                deluxe = false;
+            }
+        }
+        if (wheelImage == null) {
+            wheelImage = WheelArt.wheel(colors, boundaries(), def.imageSize, def.frameColor, def.hubColor);
+        }
         Component wheelText = PixelText.encode(wheelImage, settings.padLines(wheelImage.height));
         wheel = world.spawn(base, TextDisplay.class, td -> setupPixelDisplay(td, wheelText, scale));
 
         Component pointerText = PixelText.encode(
-                WheelArt.pointer(POINTER_W, POINTER_H, def.pointerColor), settings.padLines(POINTER_H));
+                deluxe ? WheelArt.pointerDeluxe(POINTER_W, POINTER_H, def.pointerColor)
+                        : WheelArt.pointer(POINTER_W, POINTER_H, def.pointerColor),
+                settings.padLines(POINTER_H));
         pointer = world.spawn(base, TextDisplay.class, td -> setupPixelDisplay(td, pointerText, scale));
 
         for (Reward reward : visibleRewards()) {
             items.add(world.spawn(base, ItemDisplay.class, id -> {
                 tag(id);
-                id.setItemStack(new ItemStack(reward.icon));
+                id.setItemStack(displayItem(reward));
                 id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.GUI);
                 id.setBrightness(new Display.Brightness(15, 15));
             }));
@@ -212,10 +239,10 @@ public final class WheelInstance {
         transform(wheel, wheelTranslation, spin, (float) scale(), interpolationTicks);
 
         int count = items.size();
-        double segment = 360.0 / Math.max(1, count);
+        double[] bounds = boundaries();
         double itemRing = radius() * 0.58;
-        for (int i = 0; i < count; i++) {
-            double a = Math.toRadians((i + 0.5) * segment);
+        for (int i = 0; i < count && i + 1 < bounds.length; i++) {
+            double a = Math.toRadians((bounds[i] + bounds[i + 1]) / 2.0);
             Vector3f offset = new Vector3f((float) (Math.sin(a) * itemRing), (float) (Math.cos(a) * itemRing), 0);
             Vector3f position = new Vector3f(c).add(offset.rotate(spin));
             position.z = 0.03f;
@@ -232,10 +259,32 @@ public final class WheelInstance {
 
     /** Ok (üstte) altındaki dilim; θ saat yönünde dönüş olduğundan görüntü açısı -θ. */
     private int segmentAt(double degrees) {
-        List<Reward> visible = visibleRewards();
-        int count = Math.max(1, visible.size());
+        int count = Math.max(1, visibleRewards().size());
         double imageAngle = ((-degrees % 360) + 360) % 360;
-        return Math.min(count - 1, (int) (imageAngle / (360.0 / count)));
+        return WheelArt.segmentIndex(boundaries(), count, imageAngle);
+    }
+
+    /**
+     * Görünen ödüllerin dilim sınırları (derece, 0..360, artan). Ağırlıklı dilimler kapalıysa
+     * ya da toplam ağırlık sıfırsa eşit dilimlere düşer.
+     */
+    private double[] boundaries() {
+        List<Reward> visible = visibleRewards();
+        double[] bounds = WheelArt.equalBoundaries(visible.size());
+        if (!def.weightedSlices || visible.isEmpty()) {
+            return bounds;
+        }
+        double total = visible.stream().mapToDouble(r -> Math.max(0, r.weight)).sum();
+        if (total <= 0) {
+            return bounds;
+        }
+        double acc = 0;
+        for (int i = 0; i < visible.size(); i++) {
+            bounds[i] = acc;
+            acc += Math.max(0, visible.get(i).weight) / total * 360.0;
+        }
+        bounds[visible.size()] = 360.0;
+        return bounds;
     }
 
     /** Çarkta görünen (etkin) ödüller; çizim ve seçim bu listeyi kullanır. */
@@ -396,12 +445,14 @@ public final class WheelInstance {
 
         List<Reward> visible = visibleRewards();
         Reward reward = pick(eligible);
-        int index = Math.max(0, visible.indexOf(reward));
-        int count = Math.max(1, visible.size());
+        int index = Math.max(0, Math.min(visible.indexOf(reward), Math.max(0, visible.size() - 1)));
         double chance = chanceOf(reward);
-        double segment = 360.0 / count;
-        double jitter = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.6 * segment;
-        double target = ((360.0 - ((index + 0.5) * segment + jitter)) % 360 + 360) % 360;
+        double[] bounds = boundaries();
+        double segmentStart = bounds[Math.min(index, bounds.length - 2)];
+        double segmentEnd = bounds[Math.min(index, bounds.length - 2) + 1];
+        double segmentWidth = segmentEnd - segmentStart;
+        double jitter = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.6 * segmentWidth;
+        double target = ((360.0 - ((segmentStart + segmentEnd) / 2.0 + jitter)) % 360 + 360) % 360;
 
         double start = ((angle % 360) + 360) % 360;
         double delta = def.revolutions * 360.0 + (((target - start) % 360) + 360) % 360;
@@ -510,10 +561,9 @@ public final class WheelInstance {
                 ? MM.deserialize(resolved, Placeholder.component("reward", rewardName))
                 : MM.deserialize(resolved));
         if (reward.giveItem) {
-            ItemStack gift = buildIcon(player, reward, chance);
-            Map<Integer, ItemStack> leftover =
-                    player.getInventory().addItem(gift);
-            leftover.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+            giveItem(player, payout(player, reward, chance), Math.max(1, reward.amount));
+        } else if (reward.hasNoPayout()) {
+            warnNoPayout(reward);
         }
         for (String command : reward.commands) {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), resolveText(command, player, reward, chance));
@@ -537,7 +587,7 @@ public final class WheelInstance {
     }
 
     private ItemStack buildIcon(Player player, Reward reward, double chance) {
-        ItemStack item = new ItemStack(reward.icon, Math.max(1, reward.amount));
+        ItemStack item = new ItemStack(reward.icon == null ? Material.CHEST : reward.icon, 1);
         item.editMeta(meta -> {
             meta.displayName(MM.deserialize(resolveText(reward.name, player, reward, chance)));
             if (!reward.lore.isEmpty()) {
@@ -553,6 +603,101 @@ public final class WheelInstance {
             }
         });
         return item;
+    }
+
+    /** Kazananın alacağı eşya: custom kaynak çözülürse o, aksi halde vanilla ikon (ad/lore ile). */
+    private ItemStack payout(Player player, Reward reward, double chance) {
+        if (reward.hasCustomItem()) {
+            ItemStack custom = CustomItems.sourceItem(reward.itemSource, reward.providerId, reward.itemBase64, 1);
+            if (custom != null) {
+                return custom;
+            }
+            String key = reward.itemSource + ":" + reward.providerId + ":" + stripTags(reward.name);
+            if (warnedUnresolved.add(key)) {
+                plugin.getLogger().warning("Reward '" + stripTags(reward.name) + "' on wheel '" + def.id
+                        + "' could not resolve " + reward.itemSource + " item '" + reward.providerId
+                        + "'; giving the fallback item instead.");
+            }
+        }
+        return buildIcon(player, reward, chance);
+    }
+
+    /** Eşyayı yığın limitine saygıyla verir; sığmayanlar yere düşer. */
+    private void giveItem(Player player, ItemStack base, int amount) {
+        int max = Math.max(1, base.getMaxStackSize());
+        List<ItemStack> gifts = new ArrayList<>();
+        int remaining = Math.max(1, amount);
+        while (remaining > 0) {
+            int size = Math.min(max, remaining);
+            ItemStack gift = base.clone();
+            gift.setAmount(size);
+            gifts.add(gift);
+            remaining -= size;
+        }
+        Map<Integer, ItemStack> leftover = player.getInventory().addItem(gifts.toArray(new ItemStack[0]));
+        leftover.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+    }
+
+    /** Hiç teslimatı olmayan ödül kazanılırsa konsola bir kez uyarır. */
+    private void warnNoPayout(Reward reward) {
+        String key = stripTags(reward.name);
+        if (warnedNoPayout.add(key)) {
+            plugin.getLogger().warning("Reward '" + stripTags(reward.name) + "' on wheel '" + def.id
+                    + "' has no payout (give-item is off and there are no commands); players win nothing.");
+        }
+    }
+
+    /** Çarkta ve şans menüsünde gösterilecek ikon; custom kaynaklarda gerçek eşya. */
+    public ItemStack displayItem(Reward reward) {
+        if (reward.hasCustomItem()) {
+            ItemStack custom = CustomItems.sourceItem(reward.itemSource, reward.providerId, reward.itemBase64, 1);
+            if (custom != null) {
+                return custom;
+            }
+        }
+        return new ItemStack(reward.icon == null || !reward.icon.isItem() ? Material.CHEST : reward.icon);
+    }
+
+    /** Oyuncunun kazanabildiği ödüller içinde bu ödülün şansı (%). */
+    public double chanceFor(Player player, Reward reward) {
+        List<Reward> eligible = eligibleRewards(player);
+        double total = eligible.stream().mapToDouble(r -> Math.max(0, r.weight)).sum();
+        if (total <= 0) {
+            return eligible.contains(reward) ? 100.0 / Math.max(1, eligible.size()) : 0;
+        }
+        return eligible.contains(reward) ? Math.max(0, reward.weight) / total * 100.0 : 0;
+    }
+
+    /** Oyuncu bu ödülü kazanabilir mi (izin denetimi)? */
+    public boolean canWin(Player player, Reward reward) {
+        return reward.permission == null || reward.permission.isBlank() || player.hasPermission(reward.permission);
+    }
+
+    /** Ödül adındaki %player% %reward% %wheel% <chance> yer tutucularını doldurur. */
+    public String resolveRewardText(String template, Player player, Reward reward, double chance) {
+        return resolveText(template, player, reward, chance);
+    }
+
+    /** Komut ve menü için kısa teslimat özeti (ör. "16x Iron Ingot", "Oraxen: ruby"). */
+    public String payoutLabel(Reward reward) {
+        if (reward.hasNoPayout()) {
+            return "-";
+        }
+        List<String> parts = new ArrayList<>();
+        if (reward.giveItem) {
+            if (!reward.hasCustomItem()) {
+                parts.add(reward.amount + "x " + CustomItems.prettyMaterial(reward.icon));
+            } else if (reward.itemSource == ItemSource.EXACT) {
+                String name = CustomItems.displayName(CustomItems.fromBase64(reward.itemBase64));
+                parts.add(reward.amount + "x " + (name.isBlank() ? "item" : name));
+            } else {
+                parts.add(reward.itemSource.label() + ": " + reward.providerId);
+            }
+        }
+        if (!reward.commands.isEmpty()) {
+            parts.add(reward.commands.size() + " cmd");
+        }
+        return String.join(" + ", parts);
     }
 
     Location centerLocation() {

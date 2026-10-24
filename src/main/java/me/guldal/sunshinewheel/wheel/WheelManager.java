@@ -60,6 +60,11 @@ public final class WheelManager {
         return settings;
     }
 
+    /** Sol tıkla açılan şans menüsü açık mı? (config: menu.enabled) */
+    public boolean menuEnabled() {
+        return plugin.getConfig().getBoolean("menu.enabled", true);
+    }
+
     public void load() {
         despawnAll();
         wheels.clear();

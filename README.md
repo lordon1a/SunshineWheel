@@ -1,118 +1,117 @@
 # SunshineWheel
 
-A fortune-wheel plugin for Paper servers with a **web editor** — no client mods needed.
-Players walk up to a physical, animated wheel in the world, right-click to spin, and win prizes.
+Open-source prize wheels for Paper 1.21+. You place a wheel somewhere in your world,
+fill it with rewards from a browser editor, and players right-click it to spin.
+Everything is drawn with display entities and a tiny font pack that the plugin
+builds and hosts for you, so players don't need any mods.
 
-**Setup guide (English, with screenshots): https://rehber.guldal.me/wheel-setup.html**
-(in-game: `/wheel web` also prints this link)
+[Setup guide with screenshots](https://rehber.guldal.me/wheel-setup.html) ·
+[Discord](https://discord.gg/HZEu79G8m) ·
+[Changelog](CHANGELOG.md)
 
-**Support: https://discord.gg/HZEu79G8m**
+## Quick start
 
-## Features
+1. Put the jar in `plugins/` and restart. You need Paper 1.21 or newer and Java 21.
+2. The console prints a resource pack URL and sha1. Copy them into `server.properties`
+   as `resource-pack=` and `resource-pack-sha1=`, then restart again.
+3. Three example wheels are ready: `daily`, `premium` and `vote`. Run `/wheel move daily`
+   and right-click the block where it should go. A wheel on the floor stands up;
+   a wheel on a wall hangs from it.
+4. Run `/wheel web`, open the link and edit the rewards. Saving updates the wheel in game
+   right away.
 
-- **Physical in-world wheels** — animated spins with easing styles, tick sounds and smooth motion
-- **Rewards** — names (MiniMessage + `<chance>`), weights with live percentages, per-reward
-  permission / custom win message / win sound, item payout (amount, lore, glow, custom model data),
-  console commands (`%player% %reward% %wheel%`), enable/disable
-- **Costs** — ticket items, Vault money (balance-checked, no partial charges), XP levels,
-  extra console commands; free spins per player
-- **Win effects** — particle burst, firework, rocket, spiral + ambient particles while spinning
-- **Appearance** — size plus frame / hub / pointer colors, hologram title
-- **Player preview** — sneak + right-click (or `/wheel preview <id>`) lists rewards with chances
-- **Admin tools** — `/wheel give|take`, `/wheel ticket give|take`, `/wheel stats`,
-  `/wheel resetcooldown`, per-wheel permission and on/off switch, win broadcast
-- **Web editor** (`/wheel web`) — full configuration from the browser with live canvas preview
-  and test spins; changes apply instantly in-game
-- **Integrations** — PlaceholderAPI (`%sunshinewheel_<id>_spins|wins|free|cooldown%`),
-  developer events (`WheelSpinStartEvent`, `WheelSpinWinEvent`, cancellable), Vault
-- **Safety** — spins blocked while a wheel is spinning, payments refunded if a spin is
-  interrupted, cooldowns survive restarts
+To start from scratch, run `/wheel create <id>` and right-click a block.
 
-## Requirements
+## What players see
 
-- Paper (or fork) 1.21+, Java 21+
-- Optional: Vault + an economy plugin (money costs), PlaceholderAPI (placeholders)
+- Right-click spins the wheel. The pointer ticks across the slices and slows down
+  with the easing style you picked.
+- Left-click opens a chest menu with every reward, its chance and what it pays out.
+  Rewards the player can't win yet show as locked.
+- Sneak + right-click prints the same list in chat.
+- Winning plays a sound and a particle or firework effect. You can also announce wins
+  to the whole server.
 
-## Install
+Slice sizes follow the reward weights by default. A 5% reward gets a thin slice,
+so what players see matches the real odds. Turn this off with
+`appearance.weighted-slices: false` if you want equal slices.
 
-1. Drop `SunshineWheel-1.0.0.jar` into `plugins/` and restart.
-2. Three sample wheels (`daily`, `premium`, `vote`) are created automatically —
-   place one with `/wheel move <id>`, then right-click a block.
-   Or create your own: `/wheel create <id>`, then right-click a block.
-3. Run `/wheel web` and open the link to configure everything from your browser.
+## What you can set per wheel
+
+**Rewards:** name (MiniMessage, `<chance>` shows the live percentage), weight, slice
+colour, icon item, console commands (`%player%`, `%reward%`, `%wheel%`), required
+permission, win message and sound. A reward can be turned off without deleting it.
+
+**Reward items:** a vanilla item with amount, lore, glow and custom model data, or an
+exact copy of an item you hold in game (`/wheel setitem <wheel> <n>`). Copies work for
+heads, enchanted gear and custom items. You can also give items by plugin ID from
+Oraxen, ItemsAdder, MMOItems, Nexo or ExecutableItems, for example
+`/wheel setitem daily 2 oraxen:ruby`.
+
+**Spin cost:** any mix of a ticket item, Vault money, XP levels and extra console
+commands. All costs are checked before anything is taken, and if a spin is interrupted,
+the player gets everything back. Free spins and cooldowns are saved per player and
+survive restarts.
+
+**Looks:** size, frame, hub and pointer colours, hologram title, spin duration,
+revolutions, easing style, ambient particles while spinning, and the win effect.
+
+## Commands
+
+All commands use `/wheel` (alias `/cark`) and need `sunshinewheel.admin`.
+
+| Command | |
+|---|---|
+| `web` | One-time login link for the web editor |
+| `create <id>` · `move <id>` · `cancel` | Place a wheel by right-clicking a block |
+| `remove <id>` · `list` · `reload` | Manage wheels, reload from disk |
+| `spin <id>` · `preview <id>` · `menu <id>` | Test a spin, list rewards, open the chance menu |
+| `setitem <id> <reward> [provider:id]` | Set a reward item from your hand or by plugin ID |
+| `set <id> <key> <value>` | Quick settings without opening the editor |
+| `give` · `take <player> <wheel> <n>` | Free spins |
+| `ticket <give\|take> <player> <wheel> <n>` | Ticket items |
+| `stats [player]` · `resetcooldown <player> <wheel>` | Player data |
+
+## Integrations
+
+- **Vault:** money as a spin cost
+- **PlaceholderAPI:** `%sunshinewheel_<id>_spins%`, `_wins%`, `_free%`, `_cooldown%`
+- **Developer events:** `WheelSpinStartEvent` and `WheelSpinWinEvent`. Both are cancellable.
+
+## Web editor and resource pack
+
+The plugin runs one small HTTP server (`web.port`, default `8770`). It serves the editor,
+its JSON API and `pack.zip`.
+
+- Open the port in your firewall or host panel. Then visit `http://YOUR-IP:8770/` and
+  paste the key from `/wheel web`.
+- For HTTPS, keep `web.bind: 127.0.0.1` and put nginx in front of it. A ready config is
+  in [`examples/nginx-wheel.conf`](examples/nginx-wheel.conf).
+- Already using a server resource pack? Copy `assets/sunshinewheel` from the generated
+  `pack.zip` into your own pack, because a server can only send one pack.
+
+Login links work once and expire after 10 minutes. Sessions last 12 hours and can be
+ended with the logout button.
 
 ## Language
 
-In-game messages come from `messages.yml` (English, default). Set `language: tr`
-in `config.yml` for Turkish (`messages_tr.yml`). The web editor is English.
+In-game messages are in `messages.yml` (English). Set `language: tr` in `config.yml`
+to use Turkish. The web editor is in English.
 
-## Commands (`/wheel`, alias `/cark`, permission `sunshinewheel.admin`)
+## Building from source
 
-| Command | What it does |
-|---|---|
-| `web` | One-time link for the web editor (10 min, single use) |
-| `create <id>` / `move <id>` / `cancel` | Place or move a wheel by right-clicking a block |
-| `remove <id>` / `list` / `reload` | Delete, list, reload from disk |
-| `spin <id>` | Test spin |
-| `preview <id>` | Show rewards with chances (players: sneak + right-click the wheel) |
-| `set <id> <key> <value>` | Quick tweak (style, duration, revolutions, pixel-size, image-size, upright, item-scale) |
-| `tune <key> <value>` | Text calibration without restart |
-| `angle <id> <degrees>` | Debug which slice is under the pointer |
-| `give|take <player> <wheel> <n>` | Grant/revoke free spins |
-| `ticket <give|take> <player> <wheel> <n>` | Give/take ticket items |
-| `stats [player]` | Spins, wins and free spins per wheel |
-| `resetcooldown <player> <wheel>` | Clear a player's cooldown |
-
-## Web editor hosting
-
-Nothing to install: the plugin serves the editor UI, the JSON API and the
-resource pack itself, all on one port (`web.port`, default `8770`).
-
-1. Open the port in your firewall: `ufw allow 8770/tcp` (Linux) — or allow it in
-   your host panel (Pterodactyl, Multicraft, …). Windows: see the command printed
-   at startup.
-2. Open `http://YOUR-SERVER-IP:8770/` and sign in with `/wheel web` from the game.
-   (Set `web.public-url` and the command gives a ready click-link instead.)
-3. For `server.properties`, use `http://YOUR-SERVER-IP:8770/pack.zip` as
-   `resource-pack` (sha1 is printed at startup). **Already using a resource pack?
-   Merge instead** — copy `assets/sunshinewheel` from the served `pack.zip` into
-   your own pack; Minecraft only supports one server pack at a time.
-
-Prefer HTTPS? Keep `web.bind: 127.0.0.1` and proxy it with nginx — see
-`examples/nginx-wheel.conf` (static files in that case come from `web/`).
-
-## Resource pack
-
-The wheel is drawn with a tiny bundled font. The plugin builds `pack.zip`
-(`plugins/SunshineWheel/pack.zip`) on startup and serves it — no merging needed:
-
-1. Copy the URL and sha1 from the console (`Resource pack ready: ...`).
-2. Put them in `server.properties` as `resource-pack=` and `resource-pack-sha1=`.
-3. Restart. Done.
-
-Prefer merging? Download the same `pack.zip` and copy `assets/sunshinewheel`
-into your own pack instead. See `pack:` in `config.yml` to disable the built-in
-server (the editor keeps working; only `/pack.zip` goes 404).
-
-## What's in the release zip
-
-- `plugin/SunshineWheel-1.0.0.jar` — drop into `plugins/`
-- `web/` — static web-editor files; serve at `/wheel/` (see `examples/nginx-wheel.conf`)
-- `pack/sunshinewheel-pack.zip` — same pack the plugin serves; for manual merging
-- `examples/nginx-wheel.conf` + `examples/nginx-limits.conf` — copy-paste proxy config
-- `README.md`, `LICENSE`, `CHANGELOG.md`
-
-## Build
-
-```powershell
-$env:JAVA_HOME="C:\Program Files\Java\jdk-26.0.2"
-.\gradlew.bat build
+```bash
+./gradlew build          # Windows: .\gradlew.bat build
 ```
+
+The jar ends up in `build/libs/`. `./gradlew releaseZip` also packs the editor files,
+the resource pack and the nginx examples.
+
+## Contributing
+
+Issues and pull requests are welcome. Before you open a PR, run `./gradlew build`
+and test the change on a Paper server.
 
 ## License
 
-All rights reserved. See LICENSE.
-
-## Changelog
-
-See CHANGELOG.md.
+[MIT](LICENSE). You can use it, change it and ship it on your server for free.

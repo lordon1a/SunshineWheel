@@ -5,8 +5,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import me.guldal.sunshinewheel.integration.CustomItems;
 import me.guldal.sunshinewheel.web.WebServer;
+import me.guldal.sunshinewheel.wheel.ChanceMenu;
+import me.guldal.sunshinewheel.wheel.ItemSource;
 import me.guldal.sunshinewheel.wheel.MotionStyle;
+import me.guldal.sunshinewheel.wheel.Reward;
 import me.guldal.sunshinewheel.wheel.WheelInstance;
 import me.guldal.sunshinewheel.wheel.WheelManager;
 import net.kyori.adventure.text.Component;
@@ -22,11 +26,12 @@ import org.bukkit.inventory.ItemStack;
 final class WheelCommand implements TabExecutor {
 
     private static final List<String> SUBS = List.of("create", "move", "cancel", "remove", "list", "spin", "set",
-            "tune", "angle", "reload", "web", "give", "take", "ticket", "stats", "resetcooldown", "preview");
+            "tune", "angle", "reload", "web", "give", "take", "ticket", "stats", "resetcooldown", "preview",
+            "menu", "setitem");
     private static final List<String> TUNE_KEYS = List.of("text-pixel-blocks", "text-top-units", "text-line-units",
             "interpolation-ticks");
     private static final List<String> SET_KEYS = List.of("style", "duration", "revolutions", "pixel-size",
-            "image-size", "upright", "item-scale");
+            "image-size", "upright", "item-scale", "weighted-slices");
 
     private final WheelManager manager;
     private final WebServer web;
@@ -124,6 +129,7 @@ final class WheelCommand implements TabExecutor {
                 }
             }
             case "reload" -> {
+                CustomItems.clearCache();
                 manager.load();
                 manager.spawnAll();
                 Messages.reload();
@@ -198,6 +204,20 @@ final class WheelCommand implements TabExecutor {
                 wheel.sendPreview(player);
                 return true;
             }
+            case "menu" -> {
+                WheelInstance wheel = args.length < 2 ? null : manager.get(args[1]);
+                if (!(sender instanceof Player player) || wheel == null) {
+                    return msg(sender, Messages.mm("command.menu-usage"));
+                }
+                if (!manager.menuEnabled()) {
+                    return msg(sender, Messages.mm("command.menu-off"));
+                }
+                ChanceMenu.open(player, wheel);
+                return true;
+            }
+            case "setitem" -> {
+                return setItem(sender, args);
+            }
             default -> {
                 return usage(sender);
             }
@@ -255,6 +275,55 @@ final class WheelCommand implements TabExecutor {
         return msg(sender, Messages.mm("command.ticket-done"));
     }
 
+    /** Ödülün teslim eşyasını ayarlar: eldeki eşya (birebir kopya) ya da sağlayıcı kimliği. */
+    private boolean setItem(CommandSender sender, String[] args) {
+        WheelInstance wheel = args.length < 3 ? null : manager.get(args[1]);
+        if (!(sender instanceof Player player) || wheel == null) {
+            return msg(sender, Messages.mm("command.setitem-usage"));
+        }
+        if (wheel.isSpinning()) {
+            return msg(sender, Messages.mm("command.spinning-wait"));
+        }
+        int index;
+        try {
+            index = Integer.parseInt(args[2]) - 1;
+        } catch (NumberFormatException e) {
+            return msg(sender, Messages.mm("command.setitem-bad-index"));
+        }
+        if (index < 0 || index >= wheel.def.rewards.size()) {
+            return msg(sender, Messages.mm("command.setitem-bad-index"));
+        }
+        Reward reward = wheel.def.rewards.get(index);
+        if (args.length >= 4) {
+            String spec = args[3];
+            int colon = spec.indexOf(':');
+            ItemSource source = colon > 0 ? ItemSource.parse(spec.substring(0, colon), null) : null;
+            if (source == null || !source.isProvider() || colon >= spec.length() - 1) {
+                return msg(sender, Messages.mm("command.setitem-bad-source"));
+            }
+            reward.itemSource = source;
+            reward.providerId = spec.substring(colon + 1).trim();
+            reward.itemBase64 = "";
+        } else {
+            ItemStack hand = player.getInventory().getItemInMainHand();
+            if (hand.getType().isAir()) {
+                return msg(sender, Messages.mm("command.setitem-empty-hand"));
+            }
+            String base64 = CustomItems.base64(hand);
+            if (base64.isBlank()) {
+                return msg(sender, Messages.mm("command.setitem-failed"));
+            }
+            reward.itemSource = ItemSource.EXACT;
+            reward.itemBase64 = base64;
+            reward.providerId = "";
+            reward.amount = Math.min(64, Math.max(1, hand.getAmount()));
+        }
+        manager.save();
+        manager.respawn(wheel);
+        return msg(sender, Messages.mm("command.setitem-done",
+                "n", String.valueOf(index + 1), "item", wheel.payoutLabel(reward)));
+    }
+
     private boolean set(CommandSender sender, String[] args) {
         WheelInstance wheel = args.length < 4 ? null : manager.get(args[1]);
         if (wheel == null) {
@@ -270,6 +339,7 @@ final class WheelCommand implements TabExecutor {
                 case "image-size" -> wheel.def.imageSize = Math.max(32, Math.min(256, Integer.parseInt(value)));
                 case "upright" -> wheel.def.itemsUpright = Boolean.parseBoolean(value);
                 case "item-scale" -> wheel.def.itemScale = Double.parseDouble(value);
+                case "weighted-slices" -> wheel.def.weightedSlices = Boolean.parseBoolean(value);
                 default -> {
                     return msg(sender, Messages.mm("command.unknown-setting"));
                 }
@@ -318,7 +388,7 @@ final class WheelCommand implements TabExecutor {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {
-            if (List.of("move", "remove", "spin", "set", "angle", "preview").contains(sub)) {
+            if (List.of("move", "remove", "spin", "set", "angle", "preview", "menu", "setitem").contains(sub)) {
                 return filter(manager.ids(), args[1]);
             }
             if (List.of("give", "take", "stats", "resetcooldown").contains(sub)) {
@@ -342,6 +412,17 @@ final class WheelCommand implements TabExecutor {
             if (sub.equals("set")) {
                 return filter(SET_KEYS, args[2]);
             }
+            if (sub.equals("setitem")) {
+                WheelInstance wheel = manager.get(args[1]);
+                if (wheel == null) {
+                    return List.of();
+                }
+                List<String> indexes = new ArrayList<>();
+                for (int i = 1; i <= wheel.def.rewards.size(); i++) {
+                    indexes.add(String.valueOf(i));
+                }
+                return filter(indexes, args[2]);
+            }
             return List.of();
         }
         if (args.length == 4) {
@@ -354,6 +435,15 @@ final class WheelCommand implements TabExecutor {
                     styles.add(style.name());
                 }
                 return filter(styles, args[3]);
+            }
+            if (sub.equals("setitem")) {
+                List<String> sources = new ArrayList<>();
+                for (ItemSource source : ItemSource.values()) {
+                    if (source.isProvider()) {
+                        sources.add(source.prefix() + ":");
+                    }
+                }
+                return filter(sources, args[3]);
             }
             return List.of();
         }

@@ -4,7 +4,7 @@ main: me.guldal.sunshinewheel.SunshineWheel
 api-version: '1.21'
 author: Sunshine Survival
 description: Wheel of fortune with a web editor
-website: https://rehber.guldal.me/wheel-setup.html
+website: https://rehber.sunshine-mc.net/wheel-setup.html
 softdepend: [Vault, PlaceholderAPI]
 commands:
   wheel:

@@ -41,7 +41,7 @@ public final class UpdateChecker implements Listener {
             return;
         }
         String url = plugin.getConfig().getString("update-checker.url",
-                "https://rehber.guldal.me/wheel-version.json");
+                "https://rehber.sunshine-mc.net/wheel-version.json");
         if (url == null || url.isBlank()) {
             return;
         }
@@ -130,6 +130,6 @@ public final class UpdateChecker implements Listener {
         player.sendMessage(Messages.mm("update.available",
                 "latest", latest,
                 "current", plugin.getPluginMeta().getVersion(),
-                "url", page.isBlank() ? "https://rehber.guldal.me/wheel-setup.html" : page));
+                "url", page.isBlank() ? "https://rehber.sunshine-mc.net/wheel-setup.html" : page));
     }
 }

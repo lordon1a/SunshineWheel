@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.2.0 — 2026-09-16
+
+- Chance menu: players **left-click a wheel** to open a chest-style GUI with every
+  reward, its chance percentage, weight, permission lock and payout summary
+  (paginated; `menu.enabled` in `config.yml`; `/wheel menu <id>` for admins)
+- Slice sizes now follow the chances: wheel segments are drawn proportional to
+  reward weights (toggle per wheel with `appearance.weighted-slices`, editor
+  checkbox "Slice sizes follow the chance"); the landing math, floating item
+  positions and the web preview match the same boundaries
+- Custom reward items: every reward can now pay out
+  - a **captured item copy** (Base64/NBT — any custom item: Oraxen, ItemsAdder,
+    heads, enchanted gear; capture from the web editor with "Use held item" /
+    "Pick from inventory", or in-game with `/wheel setitem <wheel> <n>`), or
+  - a **plugin item id**: Oraxen, ItemsAdder, MMOItems, Nexo, ExecutableItems
+    (`/wheel setitem <wheel> <n> oraxen:ruby`; ids are listed in the web editor)
+- Payout safety: new rewards default to "give the item on win"; rewards without
+  any payout are flagged in the editor ("NO PAYOUT" + save warning) and logged
+  to the console when won
+- `/wheel setitem <wheel> <reward> [provider:id]` added
+- Web editor: item source selector, captured item info, provider id suggestions
+  (`/api/customitems`), weighted preview canvas
+- `/wheel set <id> weighted-slices <true|false>` quick toggle added
+
 ## 1.1.0 — 2026-09-16
 
 - Built-in update checker: admins are notified in-game when a new version is out

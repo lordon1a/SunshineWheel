@@ -33,6 +33,10 @@ public final class WheelDefinition {
     public int frameColor = 0xD08A33;
     public int hubColor = 0xE2A44A;
     public int pointerColor = 0xF2B544;
+    /** Çizim stili: "deluxe" (süslü, varsayılan) veya "classic" (eski düz çizim). */
+    public String artStyle = "deluxe";
+    /** Açıkken dilim boyutları ödül ağırlığıyla orantılı çizilir; görsel şansla eşleşir. */
+    public boolean weightedSlices = true;
 
     // Ödül eşyaları
     public boolean itemsUpright = true;
@@ -104,6 +108,8 @@ public final class WheelDefinition {
         d.frameColor = Reward.parseColor(s.getString("appearance.frame-color", "#D08A33"));
         d.hubColor = Reward.parseColor(s.getString("appearance.hub-color", "#E2A44A"));
         d.pointerColor = Reward.parseColor(s.getString("appearance.pointer-color", "#F2B544"));
+        d.artStyle = normalizeStyle(s.getString("appearance.art-style", d.artStyle));
+        d.weightedSlices = s.getBoolean("appearance.weighted-slices", d.weightedSlices);
         d.itemsUpright = s.getBoolean("reward-items.upright", d.itemsUpright);
         d.itemScale = s.getDouble("reward-items.scale", d.itemScale);
         d.duration = Math.max(20, s.getInt("animation.duration", d.duration));
@@ -157,6 +163,8 @@ public final class WheelDefinition {
         s.set("appearance.frame-color", String.format("#%06X", frameColor & 0xFFFFFF));
         s.set("appearance.hub-color", String.format("#%06X", hubColor & 0xFFFFFF));
         s.set("appearance.pointer-color", String.format("#%06X", pointerColor & 0xFFFFFF));
+        s.set("appearance.art-style", artStyle);
+        s.set("appearance.weighted-slices", weightedSlices);
         s.set("reward-items.upright", itemsUpright);
         s.set("reward-items.scale", itemScale);
         s.set("animation.duration", duration);
@@ -255,5 +263,10 @@ public final class WheelDefinition {
 
     public static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    /** Bilinmeyen stil adları varsayılana ("deluxe") düşer. */
+    public static String normalizeStyle(String value) {
+        return "classic".equalsIgnoreCase(value == null ? "" : value.trim()) ? "classic" : "deluxe";
     }
 }

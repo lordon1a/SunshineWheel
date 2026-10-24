@@ -12,6 +12,8 @@ const state = {
   tab: 'general',
   materials: [],
   meta: null,
+  providers: [],
+  customItems: {},
   rewardEdit: -1,
 };
 
@@ -20,6 +22,18 @@ const FALLBACK_EFFECTS = [
   { id: 'FIREWORK', label: 'Firework' },
   { id: 'ROCKET', label: 'Rocket' },
   { id: 'SPIRAL', label: 'Spiral' },
+];
+
+const PROVIDER_IDS = ['ORAXEN', 'ITEMSADDER', 'MMOITEMS', 'NEXO', 'EXECUTABLEITEMS'];
+
+const SOURCES = [
+  { id: 'VANILLA', label: 'Vanilla material' },
+  { id: 'EXACT', label: 'Captured item (exact copy)' },
+  { id: 'ORAXEN', label: 'Oraxen item id' },
+  { id: 'ITEMSADDER', label: 'ItemsAdder item id' },
+  { id: 'MMOITEMS', label: 'MMOItems (TYPE:ID)' },
+  { id: 'NEXO', label: 'Nexo item id' },
+  { id: 'EXECUTABLEITEMS', label: 'ExecutableItems id' },
 ];
 
 const TABS = [
@@ -59,6 +73,7 @@ const TABS = [
     { key: 'frameColor', label: 'Frame color', type: 'color' },
     { key: 'hubColor', label: 'Hub color', type: 'color' },
     { key: 'pointerColor', label: 'Pointer color', type: 'color' },
+    { key: 'weightedSlices', label: 'Slice sizes follow the chance (weighted)', type: 'bool' },
   ]},
   { id: 'items', label: 'Reward Items', icon: '⚙', fields: [
     { key: 'itemsUpright', label: 'Items stay upright', type: 'bool' },
@@ -219,6 +234,7 @@ async function boot() {
   }
   try {
     state.meta = await api('meta');
+    state.providers = (state.meta && state.meta.providers) || [];
     state.materials = await api('materials');
     await loadWheels();
     showApp();
@@ -436,6 +452,32 @@ function rewardPercent(reward, total) {
   return total > 0 ? (Math.max(0, Number(reward.weight) || 0) / total) * 100 : 0;
 }
 
+function hasNoPayout(reward) {
+  return !reward.giveItem && !(reward.commands && reward.commands.length);
+}
+
+function sourceTag(reward) {
+  const source = reward.itemSource || 'VANILLA';
+  if (source === 'VANILLA') return '';
+  if (source === 'EXACT') return 'EXACT' + (reward.itemName ? ': ' + reward.itemName : '');
+  return source + (reward.providerId ? ': ' + reward.providerId : '');
+}
+
+/** Ödül ağırlıklarından dilim sınırları (0..1, kümülatif). */
+function weightedBoundaries(rewards, weighted) {
+  const bounds = [0];
+  if (!rewards.length) return bounds;
+  const total = weightTotal(rewards);
+  const useWeights = weighted !== false && total > 0;
+  let acc = 0;
+  rewards.forEach((reward) => {
+    acc += useWeights ? Math.max(0, Number(reward.weight) || 0) / total : 1 / rewards.length;
+    bounds.push(acc);
+  });
+  bounds[bounds.length - 1] = 1;
+  return bounds;
+}
+
 function renderRewardRows(list, def) {
   const rewards = def.rewards || (def.rewards = []);
   const total = weightTotal(enabledRewards(def));
@@ -447,8 +489,10 @@ function renderRewardRows(list, def) {
       el('div', { class: 'swatch', style: 'background:' + normalizeHex(reward.color) }),
       el('div', { class: 'name' }, stripTags(resolveChance(reward.name, percent)) || '(unnamed)',
         el('span', { class: 'dim', text: '  ' + (reward.icon || '') }),
+        sourceTag(reward) ? el('span', { class: 'dim', text: '  · ' + sourceTag(reward) }) : null,
         reward.commands && reward.commands.length ? el('span', { class: 'dim', text: '  · ' + reward.commands.length + ' commands' }) : null,
         reward.permission ? el('span', { class: 'dim', text: '  🔒' }) : null,
+        hasNoPayout(reward) ? el('span', { class: 'bad', text: '  ⚠ NO PAYOUT' }) : null,
         on ? null : el('span', { class: 'dim', text: '  OFF' })),
       el('div', { class: 'pct', text: percent.toFixed(1) + '%  (' + reward.weight + ')' }),
       el('div', { class: 'dim', text: normalizeHex(reward.color).toUpperCase() }),
@@ -508,39 +552,37 @@ function renderRewardEditor(reward, index) {
     el('input', { type: 'text', value: reward.winSound || '', placeholder: 'minecraft:entity.player.levelup 1 1.1',
       oninput: (event) => { reward.winSound = event.target.value; afterRewardChange(false); } })));
 
-  editor.append(el('h4', { text: 'Icon & State' }));
-  editor.append(el('div', { class: 'field' }, el('label', { text: 'Material' }),
-    el('input', {
-      list: 'material-list', value: reward.icon || '', placeholder: 'e.g. GOLD_INGOT',
-      oninput: (event) => { reward.icon = event.target.value.trim().toUpperCase(); afterRewardChange(); },
-    })));
+  editor.append(el('h4', { text: 'Item & Payout' }));
+  editor.append(renderItemSourceField(reward));
 
   const amount = el('input', {
     type: 'number', min: 1, max: 64, value: reward.amount || 1,
     oninput: () => { reward.amount = Math.max(1, Number(amount.value) || 1); afterRewardChange(); },
   });
-  const cmd = el('input', {
-    type: 'number', min: 0, max: 999999, value: reward.customModelData || 0,
-    oninput: () => { reward.customModelData = Math.max(0, Number(cmd.value) || 0); afterRewardChange(false); },
-  });
-  editor.append(el('div', { class: 'field' }, el('label', { text: 'Amount' }), amount));
-  editor.append(el('div', { class: 'field' }, el('label', { text: 'Custom model data (0 = none)' }), cmd));
+  editor.append(el('div', { class: 'field' }, el('label', { text: 'Amount (items given)' }), amount));
+  if (itemSourceOf(reward) === 'VANILLA') {
+    const cmd = el('input', {
+      type: 'number', min: 0, max: 999999, value: reward.customModelData || 0,
+      oninput: () => { reward.customModelData = Math.max(0, Number(cmd.value) || 0); afterRewardChange(false); },
+    });
+    editor.append(el('div', { class: 'field' }, el('label', { text: 'Custom model data (0 = none)' }), cmd));
+  }
 
   const boolRow = (label, get, set) => {
     const box = el('input', { type: 'checkbox', onchange: () => { set(box.checked); afterRewardChange(); } });
     box.checked = Boolean(get());
     return el('div', { class: 'field' }, el('label', { text: label }), box);
   };
-  editor.append(boolRow('Give icon as item on win', () => reward.giveItem, (v) => { reward.giveItem = v; }));
-  editor.append(boolRow('Glow', () => reward.glow, (v) => { reward.glow = v; }));
+  editor.append(boolRow('Give the item on win', () => reward.giveItem, (v) => { reward.giveItem = v; }));
+  if (itemSourceOf(reward) === 'VANILLA') {
+    editor.append(boolRow('Glow', () => reward.glow, (v) => { reward.glow = v; }));
+  }
   editor.append(boolRow('Enabled', () => reward.enabled !== false, (v) => { reward.enabled = v; }));
+  if (hasNoPayout(reward)) {
+    editor.append(el('p', { class: 'bad', text: '⚠ No payout: turn on "Give the item on win" and/or add a console command, otherwise this reward gives nothing.' }));
+  }
 
-  editor.append(el('div', { class: 'field' },
-    el('div', { class: 'row-inline' },
-      el('button', { text: '⧉ Pick from inventory', onclick: pickFromInventory }),
-      el('button', { text: '✎ Use held item', onclick: useHeldItem }))));
-
-  editor.append(el('h4', { text: 'Payout & Lore' }));
+  editor.append(el('h4', { text: 'Payout rules' }));
   const commands = el('textarea', { placeholder: 'one command per line — %player% %reward% %wheel%' });
   commands.value = (reward.commands || []).join('\n');
   commands.addEventListener('input', () => {
@@ -549,13 +591,15 @@ function renderRewardEditor(reward, index) {
   });
   editor.append(el('div', { class: 'field' }, el('label', { text: 'Console commands on win' }), commands));
 
-  const lore = el('textarea', { placeholder: 'one lore line per line (MiniMessage)' });
-  lore.value = (reward.lore || []).join('\n');
-  lore.addEventListener('input', () => {
-    reward.lore = lore.value.split('\n');
-    afterRewardChange(false);
-  });
-  editor.append(el('div', { class: 'field' }, el('label', { text: 'Item lore (shown under the name)' }), lore));
+  if (itemSourceOf(reward) === 'VANILLA') {
+    const lore = el('textarea', { placeholder: 'one lore line per line (MiniMessage)' });
+    lore.value = (reward.lore || []).join('\n');
+    lore.addEventListener('input', () => {
+      reward.lore = lore.value.split('\n');
+      afterRewardChange(false);
+    });
+    editor.append(el('div', { class: 'field' }, el('label', { text: 'Item lore (shown under the name)' }), lore));
+  }
 
   editor.append(el('h4', { text: 'Live preview' }));
   editor.append(el('div', { class: 'mini-box', id: 'reward-mini-preview' }));
@@ -563,6 +607,101 @@ function renderRewardEditor(reward, index) {
 
   editor.append(el('button', { text: 'Close', onclick: () => { state.rewardEdit = -1; renderPanel(); } }));
   return editor;
+}
+
+function itemSourceOf(reward) {
+  return reward.itemSource || 'VANILLA';
+}
+
+function isProvider(id) {
+  return PROVIDER_IDS.includes(id);
+}
+
+function capturedSize(reward) {
+  const chars = (reward.itemBase64 || '').length;
+  return chars ? Math.max(1, Math.round(chars * 0.75 / 1024)) + ' KB' : '';
+}
+
+function renderItemSourceField(reward) {
+  const wrapper = el('div', { class: 'field' }, el('label', { text: 'Item source' }));
+  const source = itemSourceOf(reward);
+  const select = el('select', {
+    onchange: (event) => {
+      reward.itemSource = event.target.value;
+      if (isProvider(event.target.value)) ensureCustomItems(event.target.value);
+      afterRewardChange();
+      renderPanel();
+    },
+  });
+  SOURCES.forEach((item) => {
+    const provider = state.providers.find((entry) => entry.id === item.id);
+    const suffix = provider && !provider.available ? ' (not installed)' : '';
+    select.append(el('option', { value: item.id, text: item.label + suffix }));
+  });
+  select.value = source;
+  wrapper.append(select);
+
+  if (source === 'VANILLA') {
+    wrapper.append(el('input', {
+      list: 'material-list', value: reward.icon || '', placeholder: 'e.g. GOLD_INGOT',
+      oninput: (event) => { reward.icon = event.target.value.trim().toUpperCase(); afterRewardChange(); },
+    }));
+  } else if (source === 'EXACT') {
+    wrapper.append(el('p', { class: 'dim', text: reward.itemBase64
+      ? 'Captured: ' + (reward.itemName || 'item') + ' (' + capturedSize(reward) + ')'
+      : 'No item captured yet — hold an item in-game and use the buttons below.' }));
+    wrapper.append(el('div', { class: 'row-inline' },
+      el('button', { text: '⧉ Pick from inventory', onclick: pickFromInventory }),
+      el('button', { text: '✎ Use held item', onclick: useHeldItem })));
+    wrapper.append(el('p', { class: 'dim', text: 'Given exactly as captured: name, lore, model and enchantments.' }));
+  } else {
+    wrapper.append(el('input', {
+      list: 'customitem-list', value: reward.providerId || '',
+      placeholder: source === 'MMOITEMS' ? 'TYPE:ID (e.g. SWORD:MYTHIC_BLADE)' : 'item id (e.g. ruby)',
+      oninput: (event) => { reward.providerId = event.target.value.trim(); afterRewardChange(false); },
+    }));
+    const provider = state.providers.find((entry) => entry.id === source);
+    if (provider && !provider.available) {
+      wrapper.append(el('p', { class: 'bad', text: 'This plugin is not installed on the server; rewards fall back to the vanilla icon.' }));
+    } else {
+      ensureCustomItems(source);
+      wrapper.append(el('p', { class: 'dim', text: 'Type an id or pick one from the suggestions.' }));
+    }
+  }
+  return wrapper;
+}
+
+async function ensureCustomItems(provider) {
+  if (!isProvider(provider)) return;
+  if (!state.customItems[provider]) {
+    try {
+      const data = await api('customitems?provider=' + encodeURIComponent(provider));
+      state.customItems[provider] = data.items || [];
+    } catch (error) {
+      state.customItems[provider] = [];
+    }
+  }
+  renderCustomItemList(provider);
+}
+
+function renderCustomItemList(provider) {
+  let datalist = document.getElementById('customitem-list');
+  if (!datalist) {
+    datalist = el('datalist', { id: 'customitem-list' });
+    document.body.append(datalist);
+  }
+  datalist.replaceChildren();
+  (state.customItems[provider] || []).forEach((item) => {
+    datalist.append(el('option', { value: item.id, label: item.name || item.id }));
+  });
+}
+
+function applyCapturedItem(reward, data) {
+  reward.itemSource = 'EXACT';
+  reward.itemBase64 = data.base64 || '';
+  reward.itemName = data.displayName || data.icon || '';
+  reward.icon = data.icon || reward.icon;
+  reward.amount = data.amount || 1;
 }
 
 function updateMiniPreview() {
@@ -579,6 +718,8 @@ function updateMiniPreview() {
       el('div', { class: 'dim small', text: 'THIS REWARD' }),
       el('div', { class: 'mini-name', text: stripTags(resolveChance(reward.name, percent)) || '(unnamed)' }),
       el('div', { class: 'dim small', text: percent.toFixed(2) + '% · x' + (reward.amount || 1) + ' · ' + (on ? 'ON' : 'OFF') }),
+      sourceTag(reward) ? el('div', { class: 'dim small', text: sourceTag(reward) }) : null,
+      hasNoPayout(reward) ? el('div', { class: 'bad small', text: '⚠ no payout' }) : null,
     ),
   );
 }
@@ -596,8 +737,9 @@ function afterRewardChange(rerenderList = true) {
 function addReward() {
   const def = currentDef();
   def.rewards.push({ name: '<white>New Reward', weight: 10, color: '#F2B544', icon: 'GOLD_INGOT',
-    commands: [], permission: '', winMessage: '', winSound: '', amount: 1, giveItem: false,
-    glow: false, enabled: true, lore: [], customModelData: 0 });
+    commands: [], permission: '', winMessage: '', winSound: '', amount: 1, giveItem: true,
+    glow: false, enabled: true, lore: [], customModelData: 0,
+    itemSource: 'VANILLA', itemBase64: '', providerId: '', itemName: '' });
   state.rewardEdit = def.rewards.length - 1;
   markDirty();
   renderPanel();
@@ -655,14 +797,13 @@ function showInventoryModal(slots) {
         const def = currentDef();
         const reward = def && def.rewards[state.rewardEdit];
         if (reward) {
-          reward.icon = slot.icon;
-          reward.amount = slot.amount;
+          applyCapturedItem(reward, slot);
           afterRewardChange();
           renderPanel();
         }
         hideModal();
       },
-    }, el('span', { text: slot.icon }), el('span', { class: 'amt', text: 'x' + slot.amount })));
+    }, el('span', { text: slot.displayName || slot.icon }), el('span', { class: 'amt', text: 'x' + slot.amount })));
   });
   $('#modal').classList.remove('hidden');
 }
@@ -681,11 +822,10 @@ async function useHeldItem() {
     const def = currentDef();
     const reward = def && def.rewards[state.rewardEdit];
     if (reward) {
-      reward.icon = data.icon;
-      reward.amount = data.amount;
+      applyCapturedItem(reward, data);
       afterRewardChange();
       renderPanel();
-      toast('Icon set from held item: ' + data.icon + ' x' + data.amount);
+      toast('Captured: ' + (data.displayName || data.icon) + ' x' + data.amount);
     }
   } catch (error) {
     toast(error.message, true);
@@ -769,11 +909,12 @@ function drawPreview(rotation, spinning) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rotation);
-    const segment = (Math.PI * 2) / rewards.length;
+    const bounds = weightedBoundaries(rewards, def && def.weightedSlices);
     rewards.forEach((reward, index) => {
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, radius, -Math.PI / 2 + index * segment, -Math.PI / 2 + (index + 1) * segment);
+      ctx.arc(0, 0, radius, -Math.PI / 2 + bounds[index] * Math.PI * 2,
+        -Math.PI / 2 + bounds[index + 1] * Math.PI * 2);
       ctx.closePath();
       ctx.fillStyle = normalizeHex(reward.color);
       ctx.fill();
@@ -803,7 +944,7 @@ function drawPreview(rotation, spinning) {
   ctx.stroke();
 
   if (!spinning && rewards.length) {
-    const segment = (Math.PI * 2) / rewards.length;
+    const bounds = weightedBoundaries(rewards, def && def.weightedSlices);
     const total = weightTotal(rewards);
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
@@ -811,7 +952,7 @@ function drawPreview(rotation, spinning) {
     ctx.strokeStyle = '#0e0b16';
     ctx.lineWidth = 3;
     rewards.forEach((reward, index) => {
-      const mid = -Math.PI / 2 + (index + 0.5) * segment;
+      const mid = -Math.PI / 2 + ((bounds[index] + bounds[index + 1]) / 2) * Math.PI * 2;
       const lx = cx + Math.cos(mid) * (radius + 24);
       const ly = cy + Math.sin(mid) * (radius + 24);
       const pct = rewardPercent(reward, total);
@@ -847,8 +988,9 @@ function testSpin() {
   } else {
     picked = Math.floor(Math.random() * rewards.length);
   }
-  const segment = (Math.PI * 2) / rewards.length;
-  const target = Math.PI * 2 * 6 + (((Math.PI * 2 - ((picked + 0.5) * segment)) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const bounds = weightedBoundaries(rewards, def && def.weightedSlices);
+  const mid = ((bounds[picked] + bounds[picked + 1]) / 2) * Math.PI * 2;
+  const target = Math.PI * 2 * 6 + (((Math.PI * 2 - mid) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   const duration = 3800;
   const startTime = performance.now();
   const mine = { id: Date.now() + Math.random() };
@@ -880,6 +1022,9 @@ function round(value) {
 async function save() {
   const def = currentDef();
   if (!def) return;
+  const noPayout = (def.rewards || []).filter((reward) => reward.enabled !== false && hasNoPayout(reward));
+  if (noPayout.length && !confirm(noPayout.length
+      + ' reward(s) have no payout and will give nothing when won. Save anyway?')) return;
   const button = $('#save');
   button.disabled = true;
   setStatus('saving…', 'dirty');
@@ -947,6 +1092,7 @@ $('#auth-form').addEventListener('submit', async (event) => {
   try {
     await authenticate(token);
     state.meta = await api('meta');
+    state.providers = (state.meta && state.meta.providers) || [];
     state.materials = await api('materials');
     await loadWheels();
     showApp();

@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -25,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import me.guldal.sunshinewheel.integration.CustomItems;
+import me.guldal.sunshinewheel.wheel.ItemSource;
 import me.guldal.sunshinewheel.wheel.MotionStyle;
 import me.guldal.sunshinewheel.wheel.WheelDefinition;
 import me.guldal.sunshinewheel.wheel.WheelInstance;
@@ -76,7 +79,7 @@ public final class WebServer {
 
     private HttpServer server;
     private ExecutorService executor;
-    private String publicUrl = "https://rehber.guldal.me/wheel/";
+    private String publicUrl = "https://rehber.sunshine-mc.net/wheel/";
     private final Map<String, byte[]> uiCache = new ConcurrentHashMap<>();
     private final RateLimiter rateLimiter = new RateLimiter();
     private byte[] packBytes = new byte[0];
@@ -234,7 +237,7 @@ public final class WebServer {
     }
 
     public String guideUrl() {
-        return plugin.getConfig().getString("web.guide-url", "https://rehber.guldal.me/wheel-setup.html");
+        return plugin.getConfig().getString("web.guide-url", "https://rehber.sunshine-mc.net/wheel-setup.html");
     }
 
     public int port() {
@@ -289,6 +292,13 @@ public final class WebServer {
                 case "/api/materials" -> {
                     if (method.equals("GET")) {
                         handleMaterials(exchange);
+                    } else {
+                        error(exchange, 405, "Method not allowed.");
+                    }
+                }
+                case "/api/customitems" -> {
+                    if (method.equals("GET")) {
+                        handleCustomItems(exchange);
                     } else {
                         error(exchange, 405, "Method not allowed.");
                     }
@@ -396,6 +406,18 @@ public final class WebServer {
             effects.add(item);
         }
         out.add("effects", effects);
+        JsonArray providers = new JsonArray();
+        for (ItemSource source : ItemSource.values()) {
+            if (!source.isProvider()) {
+                continue;
+            }
+            JsonObject item = new JsonObject();
+            item.addProperty("id", source.name());
+            item.addProperty("label", source.label());
+            item.addProperty("available", CustomItems.available(source));
+            providers.add(item);
+        }
+        out.add("providers", providers);
         json(exchange, 200, out);
     }
 
@@ -406,6 +428,37 @@ public final class WebServer {
                 .map(Material::name)
                 .sorted()
                 .forEach(out::add);
+        json(exchange, 200, out);
+    }
+
+    /** Eşya eklentisi kimlikleri: /api/customitems?provider=ORAXEN */
+    private void handleCustomItems(HttpExchange exchange) throws Exception {
+        String provider = null;
+        String query = exchange.getRequestURI().getQuery();
+        if (query != null) {
+            for (String part : query.split("&")) {
+                if (part.startsWith("provider=")) {
+                    provider = URLDecoder.decode(part.substring("provider=".length()), StandardCharsets.UTF_8);
+                }
+            }
+        }
+        ItemSource source = ItemSource.parse(provider, null);
+        if (source == null || !source.isProvider()) {
+            error(exchange, 400, "Unknown or unsupported provider.");
+            return;
+        }
+        List<CustomItems.Entry> entries = sync(() -> CustomItems.list(source));
+        JsonArray items = new JsonArray();
+        for (CustomItems.Entry entry : entries) {
+            JsonObject item = new JsonObject();
+            item.addProperty("id", entry.id());
+            item.addProperty("name", entry.name());
+            items.add(item);
+        }
+        JsonObject out = new JsonObject();
+        out.addProperty("provider", source.name());
+        out.addProperty("available", CustomItems.available(source));
+        out.add("items", items);
         json(exchange, 200, out);
     }
 
@@ -427,6 +480,8 @@ public final class WebServer {
                 slot.addProperty("slot", i);
                 slot.addProperty("icon", item.getType().name());
                 slot.addProperty("amount", item.getAmount());
+                slot.addProperty("displayName", CustomItems.displayName(item));
+                slot.addProperty("base64", CustomItems.base64(item));
                 slots.add(slot);
             }
             JsonObject result = new JsonObject();
@@ -454,6 +509,8 @@ public final class WebServer {
             } else {
                 result.addProperty("icon", hand.getType().name());
                 result.addProperty("amount", hand.getAmount());
+                result.addProperty("displayName", CustomItems.displayName(hand));
+                result.addProperty("base64", CustomItems.base64(hand));
             }
             return result;
         });

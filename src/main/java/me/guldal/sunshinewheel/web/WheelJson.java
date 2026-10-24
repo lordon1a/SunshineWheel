@@ -4,14 +4,18 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import me.guldal.sunshinewheel.integration.CustomItems;
+import me.guldal.sunshinewheel.wheel.ItemSource;
 import me.guldal.sunshinewheel.wheel.MotionStyle;
 import me.guldal.sunshinewheel.wheel.Reward;
 import me.guldal.sunshinewheel.wheel.WheelDefinition;
 import me.guldal.sunshinewheel.wheel.WinEffect;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 
 /** JSON counterpart of a wheel definition for the web API; validation happens here. */
 public final class WheelJson {
@@ -37,6 +41,8 @@ public final class WheelJson {
         o.addProperty("frameColor", String.format("#%06X", d.frameColor & 0xFFFFFF));
         o.addProperty("hubColor", String.format("#%06X", d.hubColor & 0xFFFFFF));
         o.addProperty("pointerColor", String.format("#%06X", d.pointerColor & 0xFFFFFF));
+        o.addProperty("artStyle", d.artStyle);
+        o.addProperty("weightedSlices", d.weightedSlices);
         o.addProperty("itemsUpright", d.itemsUpright);
         o.addProperty("itemScale", d.itemScale);
         o.addProperty("duration", d.duration);
@@ -82,6 +88,10 @@ public final class WheelJson {
             r.lore.forEach(lore::add);
             reward.add("lore", lore);
             reward.addProperty("customModelData", r.customModelData);
+            reward.addProperty("itemSource", r.itemSource == null ? "VANILLA" : r.itemSource.name());
+            reward.addProperty("itemBase64", r.itemBase64 == null ? "" : r.itemBase64);
+            reward.addProperty("providerId", r.providerId == null ? "" : r.providerId);
+            reward.addProperty("itemName", itemName(r));
             rewards.add(reward);
         }
         o.add("rewards", rewards);
@@ -148,6 +158,12 @@ public final class WheelJson {
         }
         if (o.has("pointerColor")) {
             d.pointerColor = Reward.parseColor(text(o, "pointerColor", "#F2B544"));
+        }
+        if (o.has("artStyle")) {
+            d.artStyle = WheelDefinition.normalizeStyle(text(o, "artStyle", d.artStyle));
+        }
+        if (o.has("weightedSlices")) {
+            d.weightedSlices = bool(o, "weightedSlices", d.weightedSlices);
         }
         if (o.has("itemsUpright")) {
             d.itemsUpright = bool(o, "itemsUpright", d.itemsUpright);
@@ -295,7 +311,38 @@ public final class WheelJson {
         }
         reward.customModelData = o.has("customModelData")
                 ? (int) clamp((long) number(o, "customModelData", 0), 0, 999999) : 0;
+        reward.itemSource = o.has("itemSource")
+                ? ItemSource.parse(text(o, "itemSource", "VANILLA"), null) : ItemSource.VANILLA;
+        if (reward.itemSource == null) {
+            throw new IllegalArgumentException("Invalid item source: " + text(o, "itemSource", ""));
+        }
+        String base64 = o.has("itemBase64") ? text(o, "itemBase64", "") : "";
+        if (base64.length() > Reward.MAX_ITEM_BASE64) {
+            throw new IllegalArgumentException("Captured item data is too large.");
+        }
+        if (!base64.isBlank()) {
+            try {
+                Base64.getDecoder().decode(base64);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Captured item data is not valid.");
+            }
+        }
+        reward.itemBase64 = base64;
+        String providerId = o.has("providerId") ? text(o, "providerId", "").trim() : "";
+        if (providerId.length() > Reward.MAX_PROVIDER_ID) {
+            throw new IllegalArgumentException("Provider item id is too long.");
+        }
+        reward.providerId = providerId;
         return reward;
+    }
+
+    /** Web editöründe göstermek için çözümlenmiş custom eşya adı (yoksa boş). */
+    private static String itemName(Reward reward) {
+        if (reward.itemSource == null || reward.itemSource == ItemSource.VANILLA) {
+            return "";
+        }
+        ItemStack item = CustomItems.sourceItem(reward.itemSource, reward.providerId, reward.itemBase64, 1);
+        return item == null ? "" : CustomItems.displayName(item);
     }
 
     private static WheelDefinition copy(WheelDefinition d) {
@@ -315,6 +362,8 @@ public final class WheelJson {
         c.frameColor = d.frameColor;
         c.hubColor = d.hubColor;
         c.pointerColor = d.pointerColor;
+        c.artStyle = d.artStyle;
+        c.weightedSlices = d.weightedSlices;
         c.itemsUpright = d.itemsUpright;
         c.itemScale = d.itemScale;
         c.duration = d.duration;
@@ -348,6 +397,9 @@ public final class WheelJson {
             copy.enabled = r.enabled;
             copy.lore.addAll(r.lore);
             copy.customModelData = r.customModelData;
+            copy.itemSource = r.itemSource;
+            copy.itemBase64 = r.itemBase64;
+            copy.providerId = r.providerId;
             c.rewards.add(copy);
         }
         return c;
@@ -369,6 +421,8 @@ public final class WheelJson {
         dst.frameColor = src.frameColor;
         dst.hubColor = src.hubColor;
         dst.pointerColor = src.pointerColor;
+        dst.artStyle = src.artStyle;
+        dst.weightedSlices = src.weightedSlices;
         dst.itemsUpright = src.itemsUpright;
         dst.itemScale = src.itemScale;
         dst.duration = src.duration;

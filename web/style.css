@@ -34,6 +34,7 @@ code {
 }
 
 .dim { color: var(--dim); }
+.bad { color: #e0564a; font-weight: 600; }
 
 /* --- sign-in screen --- */
 .auth {

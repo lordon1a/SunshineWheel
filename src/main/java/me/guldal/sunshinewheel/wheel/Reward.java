@@ -34,6 +34,18 @@ public final class Reward {
     /** 0 = yok. */
     public int customModelData;
 
+    /** Teslim kaynağı: vanilla malzeme, birebir kopya ya da bir eşya eklentisi kimliği. */
+    public ItemSource itemSource = ItemSource.VANILLA;
+    /** EXACT kaynağı için yakalanan eşyanın Base64 (NBT) kopyası. */
+    public String itemBase64 = "";
+    /** Sağlayıcı kaynakları için eşya kimliği (ör. Oraxen id, ItemsAdder namespace:id). */
+    public String providerId = "";
+
+    /** Base64 eşya kopyası için üst sınır (karakter). */
+    public static final int MAX_ITEM_BASE64 = 32768;
+    /** Sağlayıcı kimliği için üst sınır (karakter). */
+    public static final int MAX_PROVIDER_ID = 256;
+
     public Reward(String name, double weight, int color, Material icon, List<String> commands) {
         this.name = name;
         this.weight = weight;
@@ -65,7 +77,22 @@ public final class Reward {
         }
         reward.customModelData = map.get("custom-model-data") instanceof Number c
                 ? Math.max(0, c.intValue()) : 0;
+        reward.itemSource = ItemSource.parse(string(map, "item-source", "VANILLA"), ItemSource.VANILLA);
+        String base64 = string(map, "item-base64", "");
+        reward.itemBase64 = base64.length() <= MAX_ITEM_BASE64 ? base64 : "";
+        String provider = string(map, "provider-id", "");
+        reward.providerId = provider.length() <= MAX_PROVIDER_ID ? provider : "";
         return reward;
+    }
+
+    /** Vanilla dışı bir teslim kaynağı ayarlı mı? */
+    public boolean hasCustomItem() {
+        return itemSource != null && itemSource != ItemSource.VANILLA;
+    }
+
+    /** Hiçbir teslimat tanımlı değil mi (ne eşya ne komut)? */
+    public boolean hasNoPayout() {
+        return !giveItem && commands.isEmpty();
     }
 
     Map<String, Object> toMap() {
@@ -84,6 +111,9 @@ public final class Reward {
         map.put("enabled", enabled);
         map.put("lore", new ArrayList<>(lore));
         map.put("custom-model-data", customModelData);
+        map.put("item-source", itemSource == null ? ItemSource.VANILLA.name() : itemSource.name());
+        map.put("item-base64", itemBase64);
+        map.put("provider-id", providerId);
         return map;
     }
 

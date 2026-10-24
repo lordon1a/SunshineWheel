@@ -1,6 +1,7 @@
 package me.guldal.sunshinewheel;
 
 import java.util.Objects;
+import me.guldal.sunshinewheel.integration.CustomItems;
 import me.guldal.sunshinewheel.papi.WheelPlaceholders;
 import me.guldal.sunshinewheel.web.WebServer;
 import me.guldal.sunshinewheel.wheel.WheelManager;
@@ -21,6 +22,7 @@ public final class SunshineWheel extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
         Messages.init(this);
+        CustomItems.init(this);
         manager = new WheelManager(this);
         manager.load();
 

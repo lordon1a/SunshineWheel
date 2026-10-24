@@ -5,3 +5,8 @@ run/
 .idea/
 # Server-specific deploy scripts and local build artifacts (private infra, not for sale).
 dist/
+
+# Internal notes (kept locally, not published)
+HANDOFF.md
+STORE_LISTING.md
+STORE_ASSETS_BRIEF.md

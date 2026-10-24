@@ -16,6 +16,11 @@ text-line-units: 10.0
 # Higher = smoother spin, but slightly more delayed.
 interpolation-ticks: 3
 
+# Chance menu: players left-click a wheel to see every reward, its chance and
+# its payout. Set false to disable (sneak + right-click chat preview stays).
+menu:
+  enabled: true
+
 # Web editor + API + resource pack, all on one embedded server (no extra setup).
 # The editor UI is served from the jar itself at / (e.g. http://HOST:PORT/).
 # bind: 0.0.0.0 = reachable directly (zero setup; open the port in your firewall).
@@ -32,7 +37,7 @@ web:
   bind: 0.0.0.0
   port: 8770
   public-url: ""
-  guide-url: "https://rehber.guldal.me/wheel-setup.html"
+  guide-url: "https://rehber.sunshine-mc.net/wheel-setup.html"
 
 # Built-in resource pack (the 1x1 pixel font the wheel is drawn with).
 # The plugin builds pack.zip on startup and serves it at /pack.zip on the same
@@ -48,4 +53,4 @@ pack:
 # and notifies admins in-game when a newer version exists.
 update-checker:
   enabled: true
-  url: "https://rehber.guldal.me/wheel-version.json"
+  url: "https://rehber.sunshine-mc.net/wheel-version.json"

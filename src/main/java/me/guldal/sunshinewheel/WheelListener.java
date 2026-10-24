@@ -1,12 +1,20 @@
 package me.guldal.sunshinewheel;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import me.guldal.sunshinewheel.wheel.ChanceMenu;
 import me.guldal.sunshinewheel.wheel.WheelInstance;
 import me.guldal.sunshinewheel.wheel.WheelManager;
+import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -16,8 +24,12 @@ import org.bukkit.plugin.Plugin;
 
 final class WheelListener implements Listener {
 
+    /** Sol tık menüsü iki olaydan da gelebilir; çift açılışı önlemek için kısa debounce. */
+    private static final long MENU_DEBOUNCE_MS = 250;
+
     private final Plugin plugin;
     private final WheelManager manager;
+    private final Map<UUID, Long> menuOpened = new HashMap<>();
 
     WheelListener(Plugin plugin, WheelManager manager) {
         this.plugin = plugin;
@@ -42,6 +54,68 @@ final class WheelListener implements Listener {
         }
         if (!wheel.spin(player)) {
             player.sendActionBar(Messages.mm("spin.busy"));
+        }
+    }
+
+    /** Sol tık: şans menüsü. Interaction hitbox'ında damage olayı çoğu sürümde tetiklenmez. */
+    @EventHandler
+    public void onAttack(PrePlayerAttackEntityEvent event) {
+        if (!(event.getAttacked() instanceof Interaction interaction)) {
+            return;
+        }
+        WheelInstance wheel = manager.byHitbox(interaction.getUniqueId());
+        if (wheel == null) {
+            return;
+        }
+        event.setCancelled(true);
+        openMenu(event.getPlayer(), wheel);
+    }
+
+    /** Yedek yol: damage olayı tetiklenen sürümlerde sol tık buradan yakalanır. */
+    @EventHandler
+    public void onDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Interaction interaction)
+                || !(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        WheelInstance wheel = manager.byHitbox(interaction.getUniqueId());
+        if (wheel == null) {
+            return;
+        }
+        event.setCancelled(true);
+        openMenu(player, wheel);
+    }
+
+    private void openMenu(Player player, WheelInstance wheel) {
+        if (!manager.menuEnabled()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = menuOpened.get(player.getUniqueId());
+        if (last != null && now - last < MENU_DEBOUNCE_MS) {
+            return;
+        }
+        menuOpened.put(player.getUniqueId(), now);
+        ChanceMenu.open(player, wheel);
+    }
+
+    /** Menüde eşya alınmasın/taşınmasın; yalnızca sayfa düğmeleri çalışır. */
+    @EventHandler
+    public void onMenuClick(InventoryClickEvent event) {
+        if (!(event.getView().getTopInventory().getHolder() instanceof ChanceMenu menu)) {
+            return;
+        }
+        event.setCancelled(true);
+        int slot = event.getRawSlot();
+        if (slot >= 0 && slot < event.getView().getTopInventory().getSize()) {
+            menu.handleClick(slot);
+        }
+    }
+
+    @EventHandler
+    public void onMenuDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof ChanceMenu) {
+            event.setCancelled(true);
         }
     }
 
@@ -75,6 +149,7 @@ final class WheelListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         manager.cancelPlacement(event.getPlayer().getUniqueId());
+        menuOpened.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
