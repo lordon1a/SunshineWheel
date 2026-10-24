@@ -8,7 +8,7 @@ plugin builds and hosts for you, so players don't need any mods.
 
 [Setup guide](https://rehber.sunshine-mc.net/wheel-setup.html) ·
 [Download](https://github.com/lordon1a/SunshineWheel/releases/latest) ·
-[Discord](https://discord.gg/HZEu79G8m) ·
+[Discord](https://discord.gg/4fmZUfqnHw) ·
 [Changelog](https://github.com/lordon1a/SunshineWheel/blob/master/CHANGELOG.md)
 
 ## Quick start
